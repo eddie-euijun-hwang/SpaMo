@@ -4,16 +4,6 @@ import numpy as np
 
 
 class Phoenix14T(torch.utils.data.Dataset):
-    """
-    A dataset class for Phoenix14T that loads features and annotations.
-
-    Args:
-        anno_root (str): The path to the directory containing annotations.
-        vid_root (str): The path to the directory containing videos.
-        feat_root (str): The path to the directory containing features.
-        mode (str): The mode of the dataset (e.g., 'dev', 'train', 'test').
-        s2wrapper (bool): Flag to indicate usage of s2wrapping.
-    """
     def __init__(
         self,
         anno_root,
