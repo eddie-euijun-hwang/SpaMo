@@ -1,0 +1,74 @@
+model:
+  target: flan_t5_slt.FlanT5SLT
+  params:     
+    lr: 1.0e-3
+    monitor: val/bleu4
+    textual_config: google/flan-t5-xl
+    inter_hidden: 768
+    input_size: 2048
+    beam_size: 5
+    max_frame_len: 512
+    max_txt_len: 64
+    frame_sample_rate: 1
+    prompt: Translate this sentence into {}.
+    tuning_type: lora
+    fusion_mode: joint
+    ic: true
+    num_ic: 1
+    warm_up_steps: 4000
+    cross_modal_align: true
+    combined_loss: true
+    alpha: 0.1
+    scheduler_config:
+      target: lr_scheduler.LambdaWarmUpCosineScheduler
+      params:
+        verbosity_interval: 0
+        warm_up_steps: 1000
+        max_decay_steps: 50000
+        lr_start: 0.001
+        lr_max: 0.1
+        lr_min: 0.0001
+lightning:
+  callback:
+    learning_rate_logger:
+      target: pytorch_lightning.callbacks.LearningRateMonitor
+      params:
+        logging_interval: step
+  trainer:
+    accumulate_grad_batch: 1
+    accelerator: gpu
+    devices:
+    - 3
+    max_epochs: 501
+    gradient_clip_val: 1.0
+    check_val_every_n_epoch: 2
+    precision: bf16
+data:
+  target: datamodule.DataModuleFromConfig
+  params:
+    batch_size: 16
+    num_workers: 8
+    train:
+      target: phoenix14t.Phoenix14T
+      params:
+        mode: train
+        spatial: true
+        spatiotemporal: true
+        spatial_postfix: _s2wrapping
+        spatiotemporal_postfix: _overlap-8
+    validation:
+      target: phoenix14t.Phoenix14T
+      params:
+        mode: test
+        spatial: true
+        spatiotemporal: true
+        spatial_postfix: _s2wrapping
+        spatiotemporal_postfix: _overlap-8
+    test:
+      target: phoenix14t.Phoenix14T
+      params:
+        mode: test
+        spatial: true
+        spatiotemporal: true
+        spatial_postfix: _s2wrapping
+        spatiotemporal_postfix: _overlap-8
