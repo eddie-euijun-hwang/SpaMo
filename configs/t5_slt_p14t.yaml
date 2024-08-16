@@ -59,7 +59,7 @@ data:
     validation:
       target: phoenix14t.Phoenix14T
       params:
-        mode: test
+        mode: val
         spatial: true
         spatiotemporal: true
         spatial_postfix: _s2wrapping
