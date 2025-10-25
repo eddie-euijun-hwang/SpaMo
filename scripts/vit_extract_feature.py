@@ -10,7 +10,12 @@ from PIL import Image
 from transformers import AutoImageProcessor, CLIPVisionModel
 
 import sys
-sys.path.append('./')
+# Get the absolute path to the parent directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
+
+print(f"Added to path: {parent_dir}")  # Debug line
 
 from utils.s2wrapper import forward as multiscale_forward
 from utils.helpers import read_video, get_img_list
@@ -52,6 +57,11 @@ class ViTFeatureReader(object):
     @torch.no_grad()
     def get_feats(self, video):
         inputs = self.image_processor(list(video), return_tensors="pt").to(self.device).pixel_values
+        
+        # FIX: Remove extra dimension if it exists
+        if inputs.dim() == 5:
+            inputs = inputs.squeeze(0)
+        
         if self.s2_mode == "s2wrapping":
             outputs = multiscale_forward(self.forward_features, inputs, scales=self.scales, num_prefix_token=1)
         else:
@@ -125,7 +135,7 @@ def get_iterator(args, mode):
 
 
 def main():
-    mode = ["dev", "test", "train"]
+    mode = ["test"]
     for m in mode:
         parser = get_parser()
         args = parser.parse_args()
