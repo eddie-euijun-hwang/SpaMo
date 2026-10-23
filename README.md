@@ -102,7 +102,7 @@ Original instructions for Phoenix-2014T, CSL-Daily and How2Sign (feature extract
 
 ## License
 
-Our changes are under the MIT licence; the upstream code is not (see `LICENSE`). The upstream repository has no licence. Upstream terms must be respected: check [eddie-euijun-hwang/SpaMo](https://github.com/eddie-euijun-hwang/SpaMo) before reuse. The PJM Corpus data is non-commercial only, and Flan-T5, CLIP and VideoMAE have their own licences.
+Our changes are under the MIT licence; the upstream code is not (see `LICENSE`). The upstream repository has no licence. Upstream terms must be respected: check [eddie-euijun-hwang/SpaMo](https://github.com/eddie-euijun-hwang/SpaMo) before reuse. The PJM Corpus data is licensed under CC BY-SA 4.0, and Flan-T5, CLIP and VideoMAE have their own licences.
 
 ## Authors
 
