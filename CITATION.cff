@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "SpaMo-PJM: SpaMo adapted to PJM"
+type: software
+authors:
+  - family-names: "Sieńko"
+    given-names: "Wojciech"
+  - family-names: "Kovalenko"
+    given-names: "Rostyslav"
+  - family-names: "Śledzianowski"
+    given-names: "Albert"
+repository-code: "https://github.com/CrocoSign/SpaMo-PJM"
+preferred-citation:
+  type: article
+  title: "A Polish Sign Language to Text Dataset and Benchmark"
+  authors:
+    - family-names: "Sieńko"
+      given-names: "Wojciech"
+    - family-names: "Kovalenko"
+      given-names: "Rostyslav"
+    - family-names: "Śledzianowski"
+      given-names: "Albert"
+  journal: "arXiv preprint arXiv:<ARXIV ID>"
+  year: 2026
+  url: "https://arxiv.org/abs/<ARXIV ID>"
