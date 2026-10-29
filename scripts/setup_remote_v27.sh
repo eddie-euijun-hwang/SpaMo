@@ -81,7 +81,7 @@ dl(FEAT, "splits/split_val.csv",             "data/splits/split_val.csv")
 dl(FEAT, "splits/split_test.csv",            "data/splits/split_test.csv")
 
 CKPT = "CrocoSign/pjm-models"
-dl(CKPT, "checkpoints/spamo/spamo_pjm_ms_dual_bleu5.36.ckpt", "checkpoints/spamo_pjm_ms_dual_bleu5.36.ckpt",
+dl(CKPT, "checkpoints/spamo/spamo-pjm-phoenix-ms/epoch=00043-step=0129844-bleu4=5.36.ckpt", "checkpoints/spamo_pjm_ms_dual_bleu5.36.ckpt",
    repo_type="model")
 EOF
 
