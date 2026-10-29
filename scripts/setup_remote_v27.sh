@@ -80,8 +80,8 @@ dl(FEAT, "splits/split_train.csv",           "data/splits/split_train.csv")
 dl(FEAT, "splits/split_val.csv",             "data/splits/split_val.csv")
 dl(FEAT, "splits/split_test.csv",            "data/splits/split_test.csv")
 
-CKPT = "croco-corp/spamo-pjm-checkpoints"
-dl(CKPT, "spamo_pjm_ms_dual_bleu5.36.ckpt", "checkpoints/spamo_pjm_ms_dual_bleu5.36.ckpt",
+CKPT = "CrocoSign/pjm-models"
+dl(CKPT, "checkpoints/spamo/spamo_pjm_ms_dual_bleu5.36.ckpt", "checkpoints/spamo_pjm_ms_dual_bleu5.36.ckpt",
    repo_type="model")
 EOF
 
