@@ -28,7 +28,7 @@ uv sync     # or: uv pip install -e .
 
 ### Data
 
-[croco-corp/pjm-data](https://huggingface.co/datasets/croco-corp/pjm-data) holds the features, splits, translations and videos of the filtered set (29,932 pairs); its folders are `checkpoints`, `splits`, `translations`, `vectors` and `videos`, plus `dialogs_data.csv`. [croco-corp/pjm-segments](https://huggingface.co/datasets/croco-corp/pjm-segments) holds the unfiltered segments (about 40k) as WebDataset shards. This repository uses the `vectors/` and `splits/` folders of pjm-data (as in `scripts/setup_remote_v27.sh`):
+[croco-corp/pjm-data](https://huggingface.co/datasets/croco-corp/pjm-data) holds the features, splits, translations and videos of the filtered set (29,928 pairs); its folders are `checkpoints`, `splits`, `translations`, `vectors` and `videos`, plus `dialogs_data.csv`. [croco-corp/pjm-segments](https://huggingface.co/datasets/croco-corp/pjm-segments) holds the unfiltered segments (about 40k) as WebDataset shards. This repository uses the `vectors/` and `splits/` folders of pjm-data (as in `scripts/setup_remote_v27.sh`):
 
 - `vectors/vit_feat_pjm.h5`, `mae_feat_pjm.h5`, `hand_vit_feat_pjm.h5`, `mediapipe_feat_pjm.h5`, `texts_eng.h5`, `texts_multilang_pjm.h5` -> put in `features/`
 - `splits/split_{train,val,test}.csv` (SI) and `split_{train,val,test}_ms.csv` (MS) -> put in `data/splits/`
@@ -62,7 +62,7 @@ The configs contain absolute paths from our training machine (`/home/croco/...` 
 
 ## Results
 
-Test set, one run per row, beam 5. Data: 29,932 video-sentence pairs, 150 signers. **MS** (multi-signer): test signers also appear in training. **SI** (signer-independent): test signers are never seen in training. Transfer source is the sign language used before PJM.
+Test set, one run per row, beam 5. Data: 29,928 video-sentence pairs, 151 signers. **MS** (multi-signer): test signers also appear in training. **SI** (signer-independent): test signers are never seen in training. Transfer source is the sign language used before PJM.
 
 | Model | Transfer source | Split | BLEU-4 | ROUGE-L | chrF | BLEURT |
 | --- | --- | --- | --- | --- | --- | --- |
