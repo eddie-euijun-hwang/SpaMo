@@ -16,7 +16,7 @@ What we changed relative to upstream:
 - **Output language**: English. Flan-T5 turns Polish diacritics into unknown tokens, so Polish transcripts were machine-translated to English (DeepL) and used as targets. Optional in-context examples in Polish, French and Spanish (`scripts/translate_pjm_multilang.py`, NLLB-200 for French and Spanish).
 - **Mod-SpaMo** (`spamo/t5_slt.py`): extra hand-ViT and MediaPipe streams fused with the base ones by cross-attention with a zero-initialised output projection, so a model trained with two streams can be extended without changing the prefix length. Design notes: `docs/quad_fusion_xattn/`.
 - **Training/eval additions**: dropout (0.3) in the fusion module, ReduceLROnPlateau, optional frozen RoBERTa text encoder, ChrF and ROUGE-L on validation, test outputs dumped to a file and to W&B, `--tags` for W&B runs, Phoenix-2014T Lightning data module (`dataset/p14t_datamodule.py`) for pretraining on German Sign Language.
-- `configs/`: the configs behind the paper rows are named like the checkpoint folders on Hugging Face (`spamo-pjm-scratch-ms.yaml`, `mod-spamo-pjm-phoenix-si.yaml`, ...; see Reproduce). The other YAML files are earlier experiments (v3 to v29), each with a header comment saying what it tests. `docs/runs_report_v3-v21.md` is our run log (in Polish).
+- `configs/`: the configs behind the paper rows are named like the checkpoint folders on Hugging Face (`spamo-pjm-scratch-ms.yaml`, `mod-spamo-pjm-phoenix-si.yaml`, ...; see Reproduce). `finetune.yaml` is the upstream PHOENIX-2014T config. Our earlier experiments (configs v3 to v29, their queue scripts and our run log) are not part of this branch; they are in the history at commit `05e8001`.
 
 ### Requirements
 
@@ -54,11 +54,9 @@ python main.py -c configs/mod-spamo-pjm-scratch-ms.yaml -e bleu --train False --
 Config families (see each file's header):
 
 - `{spamo,mod-spamo}-pjm-scratch-{ms,si}.yaml` (formerly `finetune_v30..v33_*_scratch.yaml`): trained from scratch, MS and SI, two-stream ("dual", SpaMo) and four-stream cross-attention ("quad xattn", Mod-SpaMo).
-- `pretrain_v22*_phoenix*.yaml`, `finetune_v23*.yaml`: pretraining on Phoenix-2014T and fine-tuning on PJM (German Sign Language transfer).
-- `mod-spamo-pjm-phoenix-{ms,si}.yaml` (formerly v27): Mod-SpaMo continued from the SpaMo PHOENIX-2014T checkpoints; `spamo-pjm-phoenix-{ms,si}-test.yaml` (formerly v26): this repository's two-stream model, used to test the SpaMo checkpoints trained with the upstream code. `finetune_v25..v29_*_from_upstream.yaml` are earlier experiments from the same MS checkpoint.
-- `finetune_v3..v21_*.yaml`: earlier experiments (contrastive-only, hand-ViT, MediaPipe, plateau scheduler, generation loss, ...).
+- `mod-spamo-pjm-phoenix-{ms,si}.yaml` (formerly v27): Mod-SpaMo continued from the SpaMo PHOENIX-2014T checkpoints; `spamo-pjm-phoenix-{ms,si}-test.yaml` (formerly v26): this repository's two-stream model, used to test the SpaMo checkpoints trained with the upstream code.
 
-The configs read features from `features/` and splits from `data/splits/`, relative to the repository root, and use the default Hugging Face cache (`cache_dir: null`). The run scripts in `scripts/` (`queue_*.sh`, `setup_remote_*.sh`) are kept as we ran them and contain the paths of our training machine; `scripts/setup_remote_v27.sh` downloads the features and Flan-T5-XL (about 11 GB).
+The configs read features from `features/` and splits from `data/splits/`, relative to the repository root, and use the default Hugging Face cache (`cache_dir: null`). The run scripts in `scripts/` (`queue_*.sh`, `setup_remote_*.sh`) are kept as we ran them: they contain the paths of our training machine, and two of them also start the discarded v28/v29 runs, whose configs are only in the history; `scripts/setup_remote_v27.sh` downloads the features and Flan-T5-XL (about 11 GB).
 
 ## Results
 
