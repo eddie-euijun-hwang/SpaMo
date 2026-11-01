@@ -26,7 +26,7 @@ if [ ! -f "$UPSTREAM_PJM_MS_CKPT" ]; then
     exit 1
 fi
 python main.py \
-    -c configs/finetune_v26_dual_paper_faithful_from_upstream.yaml \
+    -c configs/spamo-pjm-phoenix-ms-test.yaml \
     --ckpt "$UPSTREAM_PJM_MS_CKPT" \
     -t False \
     --test True \
@@ -103,7 +103,7 @@ wait_gpu_idle
 echo "=== [3a] v32 dual SI scratch train: $(date) ==="
 source .venv/bin/activate
 python main.py \
-    -c configs/finetune_v32_dual_si_scratch.yaml \
+    -c configs/spamo-pjm-scratch-si.yaml \
     -e bleu \
     -n finetune_v32_dual_si_scratch \
     --tags finetune pjm-si dual scratch || echo "(v32 train failed, continuing)"
@@ -116,7 +116,7 @@ wait_gpu_idle
 if [ -n "$V32_CKPT" ]; then
     echo "=== [3b] v32 test eval: $V32_CKPT ==="
     python main.py \
-        -c configs/finetune_v32_dual_si_scratch.yaml \
+        -c configs/spamo-pjm-scratch-si.yaml \
         --ckpt "$V32_CKPT" \
         -t False \
         --test True \
@@ -133,7 +133,7 @@ wait_gpu_idle
 ###############################################################################
 echo "=== [4a] v33 quad-xattn SI scratch train: $(date) ==="
 python main.py \
-    -c configs/finetune_v33_quad_xattn_si_scratch.yaml \
+    -c configs/mod-spamo-pjm-scratch-si.yaml \
     -e bleu \
     -n finetune_v33_quad_xattn_si_scratch \
     --tags finetune pjm-si quad scratch || echo "(v33 train failed, continuing)"
@@ -146,7 +146,7 @@ wait_gpu_idle
 if [ -n "$V33_CKPT" ]; then
     echo "=== [4b] v33 test eval: $V33_CKPT ==="
     python main.py \
-        -c configs/finetune_v33_quad_xattn_si_scratch.yaml \
+        -c configs/mod-spamo-pjm-scratch-si.yaml \
         --ckpt "$V33_CKPT" \
         -t False \
         --test True \

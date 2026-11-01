@@ -1,5 +1,4 @@
-# v32 — DUAL SI from scratch (flan-t5-xl base, no upstream PJM init).
-# Ablation vs v28 (from_upstream): shows value of upstream PJM-MS checkpoint init on SI split.
+# SpaMo (dual), MS split, from scratch (Flan-T5-XL base, no PJM init); the SpaMo scratch MS row (formerly v30).
 model:
   target: spamo.t5_slt.FlanT5SLT
   params:
@@ -40,7 +39,7 @@ model:
         lr_min: 0.1
         lr_max: 1.0
         lr_start: 0.0
-        max_decay_steps: 40000
+        max_decay_steps: 50000
 
 lightning:
   callback:
@@ -54,7 +53,7 @@ lightning:
     devices: 1
     max_epochs: 30
     gradient_clip_val: 1.0
-    check_val_every_n_epoch: 3
+    check_val_every_n_epoch: 1
     precision: bf16
 
 data:
@@ -67,9 +66,9 @@ data:
     texts_path: features/texts_eng.h5
     multilang_path: features/texts_multilang_pjm.h5
     target_lang: English
-    train_split_path: data/splits/split_train.csv
-    val_split_path: data/splits/split_val.csv
-    test_split_path: data/splits/split_test.csv
+    train_split_path: data/splits/split_train_ms.csv
+    val_split_path: data/splits/split_val_ms.csv
+    test_split_path: data/splits/split_test_ms.csv
     device: cuda
     max_frame_length: 512
     set_to_test: test

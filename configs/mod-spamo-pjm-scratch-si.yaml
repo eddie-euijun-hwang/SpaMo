@@ -1,13 +1,10 @@
-# v26 — DUAL paper-faithful continuation z upstream PJM-MS dual ckpt (BLEU 5.36 dev / 5.46 test).
-# Init: SpaMo PHOENIX-2014T MS checkpoint, CrocoSign/pjm-models checkpoints/spamo/spamo-pjm-phoenix-ms/epoch=00043-step=0129844-bleu4=5.36.ckpt
-# Architektura matching upstream (dual ViT+MAE) — żaden new_stream nie destabilizuje fusion.
-# Test: czy fork code z paper-config dorówna upstream (czy always-on differences typu
-# encoder.last_hidden_state.mean dla contrastive realnie szkodzą, czy są neutralne).
+# Mod-SpaMo (quad, cross-attention), SI split before the quality filter, from scratch (Flan-T5-XL base, no PJM init); the Mod-SpaMo scratch SI row (formerly v33).
 model:
   target: spamo.t5_slt.FlanT5SLT
   params:
-    lr: 1.0e-4              # T5 + LoRA — finetune lr
-    fusion_lr: 1.0e-5       # trained projektory soft-freeze
+    lr: 1.0e-4
+    fusion_lr: 1.0e-5
+    new_stream_lr: 1.0e-4
     monitor: val/bleu4
     model_name: google/flan-t5-xl
     cache_dir: null
@@ -30,9 +27,9 @@ model:
     alpha: 1.0
     use_in_context: true
     num_in_context: 3
-    queue_size: 0           # paper-faithful: bez memory bank
-    keypoint_dim: 0         # DUAL — bez MediaPipe
-    aux_input_size: 0       # DUAL — bez hand_ViT
+    queue_size: 0
+    keypoint_dim: 258
+    aux_input_size: 2048
     motion_input_size: 1024
     lr_patience: 5
     lr_scheduler_mode: max
@@ -43,7 +40,7 @@ model:
         lr_min: 0.1
         lr_max: 1.0
         lr_start: 0.0
-        max_decay_steps: 30000
+        max_decay_steps: 40000
 
 lightning:
   callback:
@@ -55,9 +52,9 @@ lightning:
     accumulate_grad_batches: 4
     accelerator: gpu
     devices: 1
-    max_epochs: 15
+    max_epochs: 30
     gradient_clip_val: 1.0
-    check_val_every_n_epoch: 1
+    check_val_every_n_epoch: 3
     precision: bf16
 
 data:
@@ -67,12 +64,14 @@ data:
     num_workers: 4
     visual_features_path: features/vit_feat_pjm.h5
     motion_features_path: features/mae_feat_pjm.h5
+    aux_features_path: features/hand_vit_feat_pjm.h5
+    keypoint_features_path: features/mediapipe_feat_pjm.h5
     texts_path: features/texts_eng.h5
     multilang_path: features/texts_multilang_pjm.h5
     target_lang: English
-    train_split_path: data/splits/split_train_ms.csv
-    val_split_path: data/splits/split_val_ms.csv
-    test_split_path: data/splits/split_test_ms.csv
+    train_split_path: data/splits/split_train.csv
+    val_split_path: data/splits/split_val.csv
+    test_split_path: data/splits/split_test.csv
     device: cuda
     max_frame_length: 512
     set_to_test: test

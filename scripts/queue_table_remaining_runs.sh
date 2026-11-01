@@ -72,7 +72,7 @@ fi
 echo "=== [2a] v32 dual SI scratch train: $(date) ==="
 source .venv/bin/activate
 python main.py \
-    -c configs/finetune_v32_dual_si_scratch.yaml \
+    -c configs/spamo-pjm-scratch-si.yaml \
     -e bleu \
     -n finetune_v32_dual_si_scratch \
     --tags finetune pjm-si dual scratch || echo "(v32 train failed, continuing)"
@@ -83,7 +83,7 @@ V32_CKPT=$(ls -t "$V32_LOG"/checkpoints/epoch=*.ckpt 2>/dev/null | grep -v last 
 if [ -n "$V32_CKPT" ]; then
     echo "=== [2b] v32 test eval: $V32_CKPT ==="
     python main.py \
-        -c configs/finetune_v32_dual_si_scratch.yaml \
+        -c configs/spamo-pjm-scratch-si.yaml \
         --ckpt "$V32_CKPT" \
         -t False \
         --test True \
@@ -98,7 +98,7 @@ fi
 ###############################################################################
 echo "=== [3a] v33 quad-xattn SI scratch train: $(date) ==="
 python main.py \
-    -c configs/finetune_v33_quad_xattn_si_scratch.yaml \
+    -c configs/mod-spamo-pjm-scratch-si.yaml \
     -e bleu \
     -n finetune_v33_quad_xattn_si_scratch \
     --tags finetune pjm-si quad scratch || echo "(v33 train failed, continuing)"
@@ -108,7 +108,7 @@ V33_CKPT=$(ls -t "$V33_LOG"/checkpoints/epoch=*.ckpt 2>/dev/null | grep -v last 
 if [ -n "$V33_CKPT" ]; then
     echo "=== [3b] v33 test eval: $V33_CKPT ==="
     python main.py \
-        -c configs/finetune_v33_quad_xattn_si_scratch.yaml \
+        -c configs/mod-spamo-pjm-scratch-si.yaml \
         --ckpt "$V33_CKPT" \
         -t False \
         --test True \

@@ -1,12 +1,13 @@
-# SpaMo (dual ViT+MAE), filtered SI split: test of the SpaMo PHOENIX-2014T SI row.
-# Same model as finetune_v26_dual_paper_faithful_from_upstream.yaml, with the filtered SI split files.
-# Checkpoint: the best validation checkpoint of the upstream SpaMo SI run (CrocoSign/pjm-models
-# checkpoints/spamo/spamo-pjm-phoenix-si/), passed with --ckpt; run with -t False --test True.
+# Mod-SpaMo (quad, cross-attention), filtered SI split: the Mod-SpaMo PHOENIX-2014T SI row.
+# Same model and settings as mod-spamo-pjm-phoenix-ms.yaml, with the filtered SI split files.
+# Init (--ckpt): the SpaMo PHOENIX-2014T SI checkpoint (CrocoSign/pjm-models
+# checkpoints/spamo/spamo-pjm-phoenix-si/), as v27 started from the SpaMo MS checkpoint.
 model:
   target: spamo.t5_slt.FlanT5SLT
   params:
-    lr: 1.0e-4              # T5 + LoRA finetune lr
-    fusion_lr: 1.0e-5       # trained projectors, soft freeze
+    lr: 1.0e-4
+    fusion_lr: 1.0e-5
+    new_stream_lr: 1.0e-4        # aux_proj + kp_proj + aux_xattn: random init, fast learning
     monitor: val/bleu4
     model_name: google/flan-t5-xl
     cache_dir: null
@@ -29,9 +30,9 @@ model:
     alpha: 1.0
     use_in_context: true
     num_in_context: 3
-    queue_size: 0           # paper-faithful: no memory bank
-    keypoint_dim: 0         # DUAL: no MediaPipe
-    aux_input_size: 0       # DUAL: no hand_ViT
+    queue_size: 0
+    keypoint_dim: 258            # MediaPipe stream
+    aux_input_size: 2048         # hand_ViT stream
     motion_input_size: 1024
     lr_patience: 5
     lr_scheduler_mode: max
@@ -66,6 +67,8 @@ data:
     num_workers: 4
     visual_features_path: features/vit_feat_pjm.h5
     motion_features_path: features/mae_feat_pjm.h5
+    aux_features_path: features/hand_vit_feat_pjm.h5
+    keypoint_features_path: features/mediapipe_feat_pjm.h5
     texts_path: features/texts_eng.h5
     multilang_path: features/texts_multilang_pjm.h5
     target_lang: English

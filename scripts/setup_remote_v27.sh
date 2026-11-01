@@ -86,8 +86,8 @@ dl(CKPT, "checkpoints/spamo/spamo-pjm-phoenix-ms/epoch=00043-step=0129844-bleu4=
 EOF
 
 echo "=== [5/5] Fix config paths + verify ==="
-for cfg in configs/finetune_v27_quad_xattn_from_upstream.yaml \
-           configs/finetune_v26_dual_paper_faithful_from_upstream.yaml \
+for cfg in configs/mod-spamo-pjm-phoenix-ms.yaml \
+           configs/spamo-pjm-phoenix-ms-test.yaml \
            configs/finetune_v28_dual_si_from_upstream.yaml \
            configs/finetune_v29_quad_xattn_si_from_upstream.yaml; do
     sed -i 's|/home/croco/.cache/huggingface/hub|'"$HOME"'/.cache/huggingface/hub|g' "$cfg"

@@ -1,11 +1,12 @@
-# v31 — QUAD cross-attn MS from scratch (flan-t5-xl base, no upstream PJM init).
-# Ablation vs v27 (from_upstream): shows value of upstream PJM-MS checkpoint init.
+# SpaMo (dual ViT+MAE), MS split: test config of the SpaMo PHOENIX-2014T MS row (formerly v26).
+# The SpaMo checkpoints were trained with the upstream code (upstream/spamo-pjm.patch); this config
+# loads them into this repository's two-stream model, which matches the upstream architecture.
+# Checkpoint (--ckpt): CrocoSign/pjm-models checkpoints/spamo/spamo-pjm-phoenix-ms/epoch=00043-step=0129844-bleu4=5.36.ckpt
 model:
   target: spamo.t5_slt.FlanT5SLT
   params:
-    lr: 1.0e-4
-    fusion_lr: 1.0e-5
-    new_stream_lr: 1.0e-4
+    lr: 1.0e-4              # T5 + LoRA finetune lr
+    fusion_lr: 1.0e-5       # trained projektory soft-freeze
     monitor: val/bleu4
     model_name: google/flan-t5-xl
     cache_dir: null
@@ -28,9 +29,9 @@ model:
     alpha: 1.0
     use_in_context: true
     num_in_context: 3
-    queue_size: 0
-    keypoint_dim: 258
-    aux_input_size: 2048
+    queue_size: 0           # paper-faithful: no memory bank
+    keypoint_dim: 0         # DUAL: no MediaPipe
+    aux_input_size: 0       # DUAL: no hand_ViT
     motion_input_size: 1024
     lr_patience: 5
     lr_scheduler_mode: max
@@ -41,7 +42,7 @@ model:
         lr_min: 0.1
         lr_max: 1.0
         lr_start: 0.0
-        max_decay_steps: 50000
+        max_decay_steps: 30000
 
 lightning:
   callback:
@@ -53,7 +54,7 @@ lightning:
     accumulate_grad_batches: 4
     accelerator: gpu
     devices: 1
-    max_epochs: 30
+    max_epochs: 15
     gradient_clip_val: 1.0
     check_val_every_n_epoch: 1
     precision: bf16
@@ -65,8 +66,6 @@ data:
     num_workers: 4
     visual_features_path: features/vit_feat_pjm.h5
     motion_features_path: features/mae_feat_pjm.h5
-    aux_features_path: features/hand_vit_feat_pjm.h5
-    keypoint_features_path: features/mediapipe_feat_pjm.h5
     texts_path: features/texts_eng.h5
     multilang_path: features/texts_multilang_pjm.h5
     target_lang: English

@@ -1,13 +1,9 @@
-# Mod-SpaMo (quad, cross-attention), filtered SI split: the Mod-SpaMo PHOENIX-2014T SI row.
-# Same model and settings as finetune_v27_quad_xattn_from_upstream.yaml, with the filtered SI split files.
-# Init (--ckpt): the SpaMo PHOENIX-2014T SI checkpoint (CrocoSign/pjm-models
-# checkpoints/spamo/spamo-pjm-phoenix-si/), as v27 started from the SpaMo MS checkpoint.
+# SpaMo (dual), SI split before the quality filter, from scratch (Flan-T5-XL base, no PJM init); the SpaMo scratch SI row (formerly v32).
 model:
   target: spamo.t5_slt.FlanT5SLT
   params:
     lr: 1.0e-4
     fusion_lr: 1.0e-5
-    new_stream_lr: 1.0e-4        # aux_proj + kp_proj + aux_xattn: random init, fast learning
     monitor: val/bleu4
     model_name: google/flan-t5-xl
     cache_dir: null
@@ -31,8 +27,8 @@ model:
     use_in_context: true
     num_in_context: 3
     queue_size: 0
-    keypoint_dim: 258            # MediaPipe stream
-    aux_input_size: 2048         # hand_ViT stream
+    keypoint_dim: 0
+    aux_input_size: 0
     motion_input_size: 1024
     lr_patience: 5
     lr_scheduler_mode: max
@@ -43,7 +39,7 @@ model:
         lr_min: 0.1
         lr_max: 1.0
         lr_start: 0.0
-        max_decay_steps: 30000
+        max_decay_steps: 40000
 
 lightning:
   callback:
@@ -55,9 +51,9 @@ lightning:
     accumulate_grad_batches: 4
     accelerator: gpu
     devices: 1
-    max_epochs: 15
+    max_epochs: 30
     gradient_clip_val: 1.0
-    check_val_every_n_epoch: 1
+    check_val_every_n_epoch: 3
     precision: bf16
 
 data:
@@ -67,14 +63,12 @@ data:
     num_workers: 4
     visual_features_path: features/vit_feat_pjm.h5
     motion_features_path: features/mae_feat_pjm.h5
-    aux_features_path: features/hand_vit_feat_pjm.h5
-    keypoint_features_path: features/mediapipe_feat_pjm.h5
     texts_path: features/texts_eng.h5
     multilang_path: features/texts_multilang_pjm.h5
     target_lang: English
-    train_split_path: data/splits/split_train_filtered.csv
-    val_split_path: data/splits/split_val_filtered.csv
-    test_split_path: data/splits/split_test_filtered.csv
+    train_split_path: data/splits/split_train.csv
+    val_split_path: data/splits/split_val.csv
+    test_split_path: data/splits/split_test.csv
     device: cuda
     max_frame_length: 512
     set_to_test: test

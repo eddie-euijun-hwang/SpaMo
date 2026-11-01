@@ -49,14 +49,14 @@ run_spamo_test \
 
 # 3. v30 — dual MS scratch
 run_spamo_test \
-    configs/finetune_v30_dual_ms_scratch.yaml \
+    configs/spamo-pjm-scratch-ms.yaml \
     logs/2026-05-04T10-59-07_finetune_v30_dual_ms_scratch/checkpoints/epoch=00028-step=0085579-bleu4=1.97.ckpt \
     test_v30_dual_ms_scratch \
     test pjm-ms dual scratch || echo "(v30 failed, continuing)"
 
 # 4. v31 — quad-xattn MS scratch
 run_spamo_test \
-    configs/finetune_v31_quad_xattn_ms_scratch.yaml \
+    configs/mod-spamo-pjm-scratch-ms.yaml \
     logs/2026-05-05T09-06-44_finetune_v31_quad_xattn_ms_scratch/checkpoints/epoch=00009-step=0029510-bleu4=1.84.ckpt \
     test_v31_quad_ms_scratch \
     test pjm-ms quad scratch || echo "(v31 failed, continuing)"

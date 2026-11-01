@@ -16,7 +16,7 @@ What we changed relative to upstream:
 - **Output language**: English. Flan-T5 turns Polish diacritics into unknown tokens, so Polish transcripts were machine-translated to English (DeepL) and used as targets. Optional in-context examples in Polish, French and Spanish (`scripts/translate_pjm_multilang.py`, NLLB-200 for French and Spanish).
 - **Mod-SpaMo** (`spamo/t5_slt.py`): extra hand-ViT and MediaPipe streams fused with the base ones by cross-attention with a zero-initialised output projection, so a model trained with two streams can be extended without changing the prefix length. Design notes: `docs/quad_fusion_xattn/`.
 - **Training/eval additions**: dropout (0.3) in the fusion module, ReduceLROnPlateau, optional frozen RoBERTa text encoder, ChrF and ROUGE-L on validation, test outputs dumped to a file and to W&B, `--tags` for W&B runs, Phoenix-2014T Lightning data module (`dataset/p14t_datamodule.py`) for pretraining on German Sign Language.
-- `configs/`: one YAML per experiment (v3 to v33), each with a header comment saying what it tests. `docs/runs_report_v3-v21.md` is our run log (in Polish).
+- `configs/`: the configs behind the paper rows are named like the checkpoint folders on Hugging Face (`spamo-pjm-scratch-ms.yaml`, `mod-spamo-pjm-phoenix-si.yaml`, ...; see Reproduce). The other YAML files are earlier experiments (v3 to v29), each with a header comment saying what it tests. `docs/runs_report_v3-v21.md` is our run log (in Polish).
 
 ### Requirements
 
@@ -47,15 +47,15 @@ python scripts/mae_features_for_pjm.py --save-dir features --overlap-size 8 --de
 `main.py` takes one or more YAML configs. `-e bleu` is the evaluation metric argument, as in upstream.
 
 ```bash
-python main.py -c configs/finetune_v31_quad_xattn_ms_scratch.yaml -e bleu --tags ms-split 4-stream
-python main.py -c configs/finetune_v31_quad_xattn_ms_scratch.yaml -e bleu --train False --test True --ckpt /path/to/checkpoint.ckpt
+python main.py -c configs/mod-spamo-pjm-scratch-ms.yaml -e bleu --tags ms-split 4-stream
+python main.py -c configs/mod-spamo-pjm-scratch-ms.yaml -e bleu --train False --test True --ckpt /path/to/checkpoint.ckpt
 ```
 
 Config families (see each file's header):
 
-- `finetune_v30..v33_*_scratch.yaml`: trained from scratch, MS and SI, two-stream ("dual", SpaMo) and four-stream cross-attention ("quad xattn", Mod-SpaMo).
+- `{spamo,mod-spamo}-pjm-scratch-{ms,si}.yaml` (formerly `finetune_v30..v33_*_scratch.yaml`): trained from scratch, MS and SI, two-stream ("dual", SpaMo) and four-stream cross-attention ("quad xattn", Mod-SpaMo).
 - `pretrain_v22*_phoenix*.yaml`, `finetune_v23*.yaml`: pretraining on Phoenix-2014T and fine-tuning on PJM (German Sign Language transfer).
-- `finetune_v26..v29_*_from_upstream.yaml`: continue from an earlier PJM-MS checkpoint trained with the upstream code.
+- `mod-spamo-pjm-phoenix-{ms,si}.yaml` (formerly v27): Mod-SpaMo continued from the SpaMo PHOENIX-2014T checkpoints; `spamo-pjm-phoenix-{ms,si}-test.yaml` (formerly v26): this repository's two-stream model, used to test the SpaMo checkpoints trained with the upstream code. `finetune_v25..v29_*_from_upstream.yaml` are earlier experiments from the same MS checkpoint.
 - `finetune_v3..v21_*.yaml`: earlier experiments (contrastive-only, hand-ViT, MediaPipe, plateau scheduler, generation loss, ...).
 
 The configs read features from `features/` and splits from `data/splits/`, relative to the repository root, and use the default Hugging Face cache (`cache_dir: null`). The run scripts in `scripts/` (`queue_*.sh`, `setup_remote_*.sh`) are kept as we ran them and contain the paths of our training machine; `scripts/setup_remote_v27.sh` downloads the features and Flan-T5-XL (about 11 GB).
@@ -82,7 +82,7 @@ References are DeepL translations of the Polish transcripts. The PHOENIX-2014T S
 - SI generalisation is weak: SpaMo drops from 5.54 to 2.09 BLEU-4.
 - Trained from scratch, all models end near 2 BLEU-4 or below.
 - Single runs; the epoch count differs per run and the best checkpoint was chosen on the validation set.
-- The `from_upstream` configs start from the SpaMo PHOENIX-2014T MS checkpoint (dev BLEU-4 5.36).
+- The Mod-SpaMo PHOENIX-2014T MS config and the `from_upstream` configs start from the SpaMo PHOENIX-2014T MS checkpoint (dev BLEU-4 5.36).
 - SpaMo and Mod-SpaMo decode with sampling (`do_sample=True`, `top_p=0.9`, beam 5), so a second test run gives slightly different numbers. An audit after the experiments found that LoRA ran in bf16; the rows were trained before that fix.
 - Training on TPU did not work for us (no static graph), so we trained on a single GPU.
 
@@ -92,14 +92,14 @@ Checkpoints are in [CrocoSign/pjm-models](https://huggingface.co/CrocoSign/pjm-m
 
 | Row | Train | Test config | Checkpoint folder |
 | --- | --- | --- | --- |
-| SpaMo PHOENIX-2014T MS | upstream: `python main.py -c configs/finetune_pjm_ms.yaml --ckpt spamo.ckpt -e bleu` | `finetune_v26_dual_paper_faithful_from_upstream.yaml` | `spamo-pjm-phoenix-ms` |
-| SpaMo PHOENIX-2014T SI | upstream: `python main.py -c configs/finetune_pjm_si.yaml --ckpt spamo.ckpt -e bleu --patience 5` | `si_v26_dual.yaml` | `spamo-pjm-phoenix-si` |
-| Mod-SpaMo PHOENIX-2014T MS | `python main.py -c configs/finetune_v27_quad_xattn_from_upstream.yaml --ckpt <SpaMo MS checkpoint> -e bleu` | same | `mod-spamo-pjm-phoenix-ms` |
-| Mod-SpaMo PHOENIX-2014T SI | `python main.py -c configs/si_v27_quad.yaml --ckpt <SpaMo SI checkpoint> -e bleu` | same | `mod-spamo-pjm-phoenix-si` |
-| SpaMo / Mod-SpaMo scratch MS | `python main.py -c configs/finetune_v30_dual_ms_scratch.yaml -e bleu` (Mod-SpaMo: `finetune_v31_quad_xattn_ms_scratch.yaml`) | same | `spamo-pjm-scratch-ms`, `mod-spamo-pjm-scratch-ms` |
-| SpaMo / Mod-SpaMo scratch SI | `python main.py -c configs/finetune_v32_dual_si_scratch.yaml -e bleu` (Mod-SpaMo: `finetune_v33_quad_xattn_si_scratch.yaml`) | same | `spamo-pjm-scratch-si`, `mod-spamo-pjm-scratch-si` |
+| SpaMo PHOENIX-2014T MS | upstream: `python main.py -c configs/spamo-pjm-phoenix-ms.yaml --ckpt spamo.ckpt -e bleu` | `spamo-pjm-phoenix-ms-test.yaml` | `spamo-pjm-phoenix-ms` |
+| SpaMo PHOENIX-2014T SI | upstream: `python main.py -c configs/spamo-pjm-phoenix-si.yaml --ckpt spamo.ckpt -e bleu --patience 5` | `spamo-pjm-phoenix-si-test.yaml` | `spamo-pjm-phoenix-si` |
+| Mod-SpaMo PHOENIX-2014T MS | `python main.py -c configs/mod-spamo-pjm-phoenix-ms.yaml --ckpt <SpaMo MS checkpoint> -e bleu` | same | `mod-spamo-pjm-phoenix-ms` |
+| Mod-SpaMo PHOENIX-2014T SI | `python main.py -c configs/mod-spamo-pjm-phoenix-si.yaml --ckpt <SpaMo SI checkpoint> -e bleu` | same | `mod-spamo-pjm-phoenix-si` |
+| SpaMo / Mod-SpaMo scratch MS | `python main.py -c configs/spamo-pjm-scratch-ms.yaml -e bleu` (Mod-SpaMo: `mod-spamo-pjm-scratch-ms.yaml`) | same | `spamo-pjm-scratch-ms`, `mod-spamo-pjm-scratch-ms` |
+| SpaMo / Mod-SpaMo scratch SI | `python main.py -c configs/spamo-pjm-scratch-si.yaml -e bleu` (Mod-SpaMo: `mod-spamo-pjm-scratch-si.yaml`) | same | `spamo-pjm-scratch-si`, `mod-spamo-pjm-scratch-si` |
 
-`run_phoenix_si.sh` in the patch is the script that ran the SI chain (SpaMo SI training, its test, Mod-SpaMo SI training and test) on our machine; it uses our directory layout, so read it as a record of the four commands above. BLEURT-20 comes from `scripts/compute_bleurt.py <test_outputs.txt>`.
+`run_phoenix_si.sh` in the patch is the script that ran the SI chain (SpaMo SI training, its test, Mod-SpaMo SI training and test) on our machine; it uses our directory layout (the run names match the log folders in `results/spamo/` on Hugging Face), so read it as a record of the four commands above. BLEURT-20 comes from `scripts/compute_bleurt.py <test_outputs.txt>`.
 
 ## Upstream
 

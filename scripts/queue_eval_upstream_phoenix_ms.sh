@@ -19,7 +19,7 @@ source .venv/bin/activate
 
 echo "=== Local eval: upstream SpaMo PHOENIX→PJM-MS ==="
 python main.py \
-    -c configs/finetune_v26_dual_paper_faithful_from_upstream.yaml \
+    -c configs/spamo-pjm-phoenix-ms-test.yaml \
     --ckpt checkpoints/pheonix-spamo-pretrained.ckpt \
     -t False \
     --test True \

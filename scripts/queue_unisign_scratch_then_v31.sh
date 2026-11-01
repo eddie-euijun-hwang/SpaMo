@@ -23,7 +23,7 @@ echo "=== [1/2] Uni-Sign MS scratch (no transfer init) ==="
 echo "=== [2/2] launching v31 (Mod-SpaMo quad-xattn MS PJM-only) ==="
 source .venv/bin/activate
 python main.py \
-    -c configs/finetune_v31_quad_xattn_ms_scratch.yaml \
+    -c configs/mod-spamo-pjm-scratch-ms.yaml \
     -e bleu \
     -n finetune_v31_quad_xattn_ms_scratch \
     --tags finetune pjm-ms quad scratch

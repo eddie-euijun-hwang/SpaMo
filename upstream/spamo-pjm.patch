@@ -120,11 +120,11 @@ index b89e233..ed21fd5 100644
  
  
  def normalize(x):
-diff --git a/configs/finetune_pjm_ms.yaml b/configs/finetune_pjm_ms.yaml
+diff --git a/configs/spamo-pjm-phoenix-ms.yaml b/configs/spamo-pjm-phoenix-ms.yaml
 new file mode 100644
 index 0000000..69d8628
 --- /dev/null
-+++ b/configs/finetune_pjm_ms.yaml
++++ b/configs/spamo-pjm-phoenix-ms.yaml
 @@ -0,0 +1,76 @@
 +# Fine-tune upstream SpaMo (paper-faithful code) on PJM, MS split.
 +# Init from the released spamo.ckpt (PHOENIX-2014T DE->DE, BLEU 25.40 ground truth).
@@ -202,11 +202,11 @@ index 0000000..69d8628
 +        texts_path: features/texts_eng.h5
 +        multilang_path: features/texts_multilang_pjm.h5
 +        target_lang: English
-diff --git a/configs/finetune_pjm_si.yaml b/configs/finetune_pjm_si.yaml
+diff --git a/configs/spamo-pjm-phoenix-si.yaml b/configs/spamo-pjm-phoenix-si.yaml
 new file mode 100644
 index 0000000..2624fdb
 --- /dev/null
-+++ b/configs/finetune_pjm_si.yaml
++++ b/configs/spamo-pjm-phoenix-si.yaml
 @@ -0,0 +1,76 @@
 +# Fine-tune upstream SpaMo (paper-faithful code) on PJM, SI split.
 +# Init from the released spamo.ckpt (PHOENIX-2014T DE->DE, BLEU 25.40 ground truth).
@@ -511,18 +511,18 @@ index 0000000..47ea980
 +
 +echo "start spamo si $(date)"
 +cd "$HOME/SpaMo"
-+.venv/bin/python main.py -c configs/finetune_pjm_si.yaml --ckpt spamo.ckpt -e bleu --patience 5 -n finetune_pjm_si_upstream
++.venv/bin/python main.py -c configs/spamo-pjm-phoenix-si.yaml --ckpt spamo.ckpt -e bleu --patience 5 -n finetune_pjm_si_upstream
 +best=$(ls -t logs/*_finetune_pjm_si_upstream/checkpoints/*.ckpt | head -1)
 +echo "spamo si best $HOME/SpaMo/$best $(date)"
 +
 +cd "$HOME/SpaMo-PJM-4f11b72"
 +py="$HOME/SpaMo-PJM/.venv/bin/python"
-+"$py" main.py -c configs/si_v26_dual.yaml --ckpt "$HOME/SpaMo/$best" -t False --test True -n test_upstream_pjm_si_dual
++"$py" main.py -c configs/spamo-pjm-phoenix-si-test.yaml --ckpt "$HOME/SpaMo/$best" -t False --test True -n test_upstream_pjm_si_dual
 +echo "start mod-spamo si $(date)"
-+"$py" main.py -c configs/si_v27_quad.yaml --ckpt "$HOME/SpaMo/$best" -e bleu -n finetune_v27_quad_xattn_si_filtered
++"$py" main.py -c configs/mod-spamo-pjm-phoenix-si.yaml --ckpt "$HOME/SpaMo/$best" -e bleu -n finetune_v27_quad_xattn_si_filtered
 +mbest=$(ls -t logs/*_finetune_v27_quad_xattn_si_filtered/checkpoints/*.ckpt | head -1)
 +echo "mod-spamo si best $mbest $(date)"
-+"$py" main.py -c configs/si_v27_quad.yaml --ckpt "$mbest" -t False --test True -n test_v27_quad_si_filtered
++"$py" main.py -c configs/mod-spamo-pjm-phoenix-si.yaml --ckpt "$mbest" -t False --test True -n test_v27_quad_si_filtered
 +echo "end $(date)"
 diff --git a/run_eval_pipeline.sh b/run_eval_pipeline.sh
 new file mode 100755

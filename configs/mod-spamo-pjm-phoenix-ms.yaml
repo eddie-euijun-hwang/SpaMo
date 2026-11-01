@@ -1,18 +1,19 @@
-# v27 — QUAD cross-attn continuation z upstream PJM-MS dual ckpt (BLEU 5.36 dev / 5.46 test).
-# Init: SpaMo PHOENIX-2014T MS checkpoint, CrocoSign/pjm-models checkpoints/spamo/spamo-pjm-phoenix-ms/epoch=00043-step=0129844-bleu4=5.36.ckpt
-# Architektura: dual ViT+MAE + aux (hand_ViT) + kp (MediaPipe) via cross-attention enrichment.
-# aux_xattn.proj zero-init → forward identyczny z dual na step 0 → init BLEU = 5.36.
-# Prefix length [V+M] niezmienny (jak dual) — T5 widzi trenowany kształt prefixu.
-# Fixes vs v25 (failed quad):
-#   - cross-attn zamiast konkatenacji → brak prefix length mismatch
-#   - dropout refactor → state_dict keys 1:1 z upstream ckpt
-#   - text_embeds = embed_tokens.mean (paper-faithful, nie encoder.last_hidden)
+# Mod-SpaMo (quad, cross-attention), MS split: the Mod-SpaMo PHOENIX-2014T MS row (formerly v27).
+# Init (--ckpt): the SpaMo PHOENIX-2014T MS checkpoint, CrocoSign/pjm-models
+# checkpoints/spamo/spamo-pjm-phoenix-ms/epoch=00043-step=0129844-bleu4=5.36.ckpt
+# Streams: dual ViT+MAE plus hand ViT (aux) and MediaPipe keypoints (kp), merged by cross-attention.
+# aux_xattn.proj is zero-initialised, so at step 0 the forward pass equals the dual model (init BLEU 5.36).
+# The prefix length [V+M] is unchanged, so T5 sees the prefix shape it was trained on.
+# Fixes against v25 (a failed quad run):
+#   - cross-attention instead of concatenation, so no prefix length mismatch
+#   - dropout refactor, so the state_dict keys match the upstream checkpoint 1:1
+#   - text_embeds = embed_tokens.mean (paper-faithful, not encoder.last_hidden)
 model:
   target: spamo.t5_slt.FlanT5SLT
   params:
     lr: 1.0e-4
     fusion_lr: 1.0e-5
-    new_stream_lr: 1.0e-4        # aux_proj + kp_proj + aux_xattn — random init, fast learning
+    new_stream_lr: 1.0e-4        # aux_proj + kp_proj + aux_xattn: random init, fast learning
     monitor: val/bleu4
     model_name: google/flan-t5-xl
     cache_dir: null

@@ -15,7 +15,7 @@ echo "=== [1/2] Uni-Sign eval ==="
 echo "=== [2/2] launching v30 (dual MS scratch) ==="
 source .venv/bin/activate
 python main.py \
-    -c configs/finetune_v30_dual_ms_scratch.yaml \
+    -c configs/spamo-pjm-scratch-ms.yaml \
     -e bleu \
     -n finetune_v30_dual_ms_scratch \
     --tags finetune pjm-ms dual scratch
