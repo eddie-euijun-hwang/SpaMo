@@ -6,7 +6,7 @@ model:
     fusion_lr: 1.0e-5
     monitor: val/loss
     model_name: google/flan-t5-xl
-    cache_dir: /home/croco/.cache/huggingface/hub
+    cache_dir: null
     inter_hidden: 768
     input_size: 2048          # vit_feat (spatial stream)
     beam_size: 4
@@ -53,9 +53,9 @@ data:
     visual_features_path: features/vit_feat_pjm.h5
     motion_features_path: features/mae_feat_pjm.h5
     texts_path: features/texts_eng.h5
-    train_split_path: /home/croco/CrocoSign/data/split_train_filtered.csv
-    val_split_path: /home/croco/CrocoSign/data/split_val_filtered.csv
-    test_split_path: /home/croco/CrocoSign/data/split_test_filtered.csv
+    train_split_path: data/splits/split_train_filtered.csv
+    val_split_path: data/splits/split_val_filtered.csv
+    test_split_path: data/splits/split_test_filtered.csv
     device: cuda
     max_frame_length: 512
     set_to_test: test

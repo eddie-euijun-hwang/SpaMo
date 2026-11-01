@@ -1,0 +1,563 @@
+aee7f8b
+diff --git a/main.py b/main.py
+index 0aca294..910aa7b 100644
+--- a/main.py
++++ b/main.py
+@@ -89,6 +89,10 @@ def get_parser() -> argparse.ArgumentParser:
+         '--ckpt', type=str, default=None,
+         help='Checkpoint file for resuming or testing'
+     )
++    parser.add_argument(
++        '--patience', type=int, default=50,
++        help='Early stopping patience, in validation checks'
++    )
+     parser.add_argument(
+         '-e', '--evaluation', type=str, default='mse',
+         help='Evaluation metric to use'
+@@ -185,7 +189,7 @@ def configure_callbacks(
+             mode="max"
+         ))
+         callbacks.append(EarlyStopping(
+-            monitor=model.monitor, verbose=True, patience=50, mode="max"
++            monitor=model.monitor, verbose=True, patience=opt.patience, mode="max"
+         ))
+     else:
+         callbacks.append(ModelCheckpoint(
+@@ -197,7 +201,7 @@ def configure_callbacks(
+             mode="min"
+         ))
+         callbacks.append(EarlyStopping(
+-            monitor=model.monitor, verbose=True, patience=50, mode="min"
++            monitor=model.monitor, verbose=True, patience=opt.patience, mode="min"
+         ))
+     
+     # Setup callback for logging configuration
+diff --git a/spamo/t5_slt.py b/spamo/t5_slt.py
+index 5a72c21..da7dd17 100644
+--- a/spamo/t5_slt.py
++++ b/spamo/t5_slt.py
+@@ -346,8 +346,11 @@ class FlanT5SLT(AbstractSLT):
+                 glosses.append(sample['gloss'])
+                 langs.append(sample['lang'])
+                 
++                # Use pl_text if present (PJM EN target: avoids degenerate en==text identity);
++                # otherwise fall back to en_text (Phoenix DE->DE: paper original).
++                first_lang = sample.get('pl_text') or sample.get('en_text', sample['text'])
+                 _ex_lang_trans = [
+-                    f"{sample['en_text']}={sample['text']}",
++                    f"{first_lang}={sample['text']}",
+                     f"{sample['fr_text']}={sample['text']}",
+                     f"{sample['es_text']}={sample['text']}"
+                 ]
+@@ -589,7 +592,36 @@ class FlanT5SLT(AbstractSLT):
+             print(f"\033[94mReference: {self.references[i]}\033[0m")  # Blue color for references
+             print(f"\033[92mGenerated: {self.generated[i]}\033[0m")    # Green color for generated
+             print("-" * 50)
+-            
++
++        # Dump full ref/gen pairs locally (paper-faithful callback was deadcode)
++        # AND log W&B table for dashboard inspection: wandb.Table can drop entries
++        # silently with very large rows, so 1468 pairs may need chunking.
++        try:
++            save_dir = self.logger.save_dir if self.logger and hasattr(self.logger, 'save_dir') else '.'
++            path = os.path.join(save_dir, 'test_outputs.txt')
++            with open(path, 'w') as f:
++                f.write(f"# {len(self.generated)} pairs\n\n")
++                for i, (gen, ref) in enumerate(zip(self.generated, self.references)):
++                    f.write(f"[{i}]\nReference: {ref}\nGenerated: {gen}\n\n")
++            print(f"Dumped {len(self.generated)} pairs -> {path}")
++        except Exception as e:
++            print(f"Could not dump outputs: {e}")
++
++        try:
++            if self.logger and hasattr(self.logger, 'experiment'):
++                import wandb
++                table = wandb.Table(
++                    columns=["idx", "reference", "generated"],
++                    data=[[i, ref, gen] for i, (ref, gen) in enumerate(zip(self.references, self.generated))],
++                )
++                self.logger.experiment.log({
++                    "test/translations": table,
++                    "trainer/global_step": self.global_step,
++                })
++                print(f"Logged {len(self.generated)} translations to W&B table 'test/translations'")
++        except Exception as e:
++            print(f"Could not log W&B table: {e}")
++
+         # Calculate evaluation metrics
+         eval_res = evaluate_results(
+             predictions=self.generated,
+diff --git a/utils/helpers.py b/utils/helpers.py
+index b89e233..ed21fd5 100644
+--- a/utils/helpers.py
++++ b/utils/helpers.py
+@@ -6,13 +6,21 @@ import glob
+ 
+ 
+ def derangement(lst):
+-    assert len(lst) > 1, "List must have at least two elements."
+-    
+-    while True:
+-        shuffled = lst[:]
+-        random.shuffle(shuffled)
+-        if all(original != shuffled[i] for i, original in enumerate(lst)):
+-            return shuffled
++    # Upstream version had infinite while-True rejection sampling on VALUES,
++    # which hangs when the list contains duplicates (PJM has many: e.g. "Yes.",
++    # "I don't know." across samples). Fix: derangement on INDICES (always exists
++    # for n >= 2), capped retries, deterministic rotation fallback. See
++    # docs/derangement_deadlock/README.md in SpaMo-PJM fork for full diagnosis.
++    if len(lst) <= 1:
++        return lst
++
++    n = len(lst)
++    indices = list(range(n))
++    for _ in range(1000):
++        random.shuffle(indices)
++        if all(indices[i] != i for i in range(n)):
++            return [lst[i] for i in indices]
++    return lst[1:] + lst[:1]
+ 
+ 
+ def normalize(x):
+diff --git a/configs/finetune_pjm_ms.yaml b/configs/finetune_pjm_ms.yaml
+new file mode 100644
+index 0000000..69d8628
+--- /dev/null
++++ b/configs/finetune_pjm_ms.yaml
+@@ -0,0 +1,76 @@
++# Finetune PJM-MS na upstream SpaMo (paper-faithful code).
++# Init z released spamo.ckpt (Phoenix DE->DE, BLEU 25.40 ground-truth).
++# Cel: czysty test "Phoenix->PJM transfer w paper-faithful SpaMo".
++model:
++  target: spamo.t5_slt.FlanT5SLT
++  params:
++    lr: 6.0e-4
++    monitor: val/bleu4
++    model_name: google/flan-t5-xl
++    cache_dir: null
++    inter_hidden: 768
++    input_size: 2048
++    beam_size: 5
++    max_frame_len: 512
++    max_txt_len: 64
++    frame_sample_rate: 1
++    prompt: "Translate the given sentence into {}."
++    tuning_type: lora
++    lora_r: 16
++    lora_alpha: 32
++    lora_dropout: 0.1
++    fusion_mode: joint
++    warm_up_steps: 0
++    cross_modal_align: true
++    combined_loss: true
++    alpha: 1.0
++    use_in_context: true
++    num_in_context: 3
++
++lightning:
++  callback:
++    learning_rate_logger:
++      target: pytorch_lightning.callbacks.LearningRateMonitor
++      params:
++        logging_interval: step
++  trainer:
++    accumulate_grad_batches: 4   # paper batch=8 acc=2 (eff=16); my batch=2 acc=8 = ten sam eff, mniej VRAM
++    accelerator: gpu
++    devices: 1
++    max_epochs: 100
++    gradient_clip_val: 1.0
++    check_val_every_n_epoch: 2
++    precision: bf16
++
++data:
++  target: dataset.datamodule.DataModuleFromConfig
++  params:
++    batch_size: 2              # OOM on a 24 GB RTX 3090 at batch=8 (the paper used A100 40GB+)
++    num_workers: 4
++    train:
++      target: dataset.pjm.PJMKorpus
++      params:
++        split_csv: data/splits/split_train_ms.csv
++        visual_features_path: features/vit_feat_pjm.h5
++        motion_features_path: features/mae_feat_pjm.h5
++        texts_path: features/texts_eng.h5
++        multilang_path: features/texts_multilang_pjm.h5
++        target_lang: English
++    validation:
++      target: dataset.pjm.PJMKorpus
++      params:
++        split_csv: data/splits/split_val_ms.csv      # proper val split (no test peeking)
++        visual_features_path: features/vit_feat_pjm.h5
++        motion_features_path: features/mae_feat_pjm.h5
++        texts_path: features/texts_eng.h5
++        multilang_path: features/texts_multilang_pjm.h5
++        target_lang: English
++    test:
++      target: dataset.pjm.PJMKorpus
++      params:
++        split_csv: data/splits/split_test_ms.csv
++        visual_features_path: features/vit_feat_pjm.h5
++        motion_features_path: features/mae_feat_pjm.h5
++        texts_path: features/texts_eng.h5
++        multilang_path: features/texts_multilang_pjm.h5
++        target_lang: English
+diff --git a/configs/finetune_pjm_si.yaml b/configs/finetune_pjm_si.yaml
+new file mode 100644
+index 0000000..2624fdb
+--- /dev/null
++++ b/configs/finetune_pjm_si.yaml
+@@ -0,0 +1,76 @@
++# Finetune PJM-MS na upstream SpaMo (paper-faithful code).
++# Init z released spamo.ckpt (Phoenix DE->DE, BLEU 25.40 ground-truth).
++# Cel: czysty test "Phoenix->PJM transfer w paper-faithful SpaMo".
++model:
++  target: spamo.t5_slt.FlanT5SLT
++  params:
++    lr: 6.0e-4
++    monitor: val/bleu4
++    model_name: google/flan-t5-xl
++    cache_dir: null
++    inter_hidden: 768
++    input_size: 2048
++    beam_size: 5
++    max_frame_len: 512
++    max_txt_len: 64
++    frame_sample_rate: 1
++    prompt: "Translate the given sentence into {}."
++    tuning_type: lora
++    lora_r: 16
++    lora_alpha: 32
++    lora_dropout: 0.1
++    fusion_mode: joint
++    warm_up_steps: 0
++    cross_modal_align: true
++    combined_loss: true
++    alpha: 1.0
++    use_in_context: true
++    num_in_context: 3
++
++lightning:
++  callback:
++    learning_rate_logger:
++      target: pytorch_lightning.callbacks.LearningRateMonitor
++      params:
++        logging_interval: step
++  trainer:
++    accumulate_grad_batches: 4   # paper batch=8 acc=2 (eff=16); my batch=2 acc=8 = ten sam eff, mniej VRAM
++    accelerator: gpu
++    devices: 1
++    max_epochs: 100
++    gradient_clip_val: 1.0
++    check_val_every_n_epoch: 2
++    precision: bf16
++
++data:
++  target: dataset.datamodule.DataModuleFromConfig
++  params:
++    batch_size: 2              # OOM on a 24 GB RTX 3090 at batch=8 (the paper used A100 40GB+)
++    num_workers: 4
++    train:
++      target: dataset.pjm.PJMKorpus
++      params:
++        split_csv: data/splits/split_train_filtered.csv
++        visual_features_path: features/vit_feat_pjm.h5
++        motion_features_path: features/mae_feat_pjm.h5
++        texts_path: features/texts_eng.h5
++        multilang_path: features/texts_multilang_pjm.h5
++        target_lang: English
++    validation:
++      target: dataset.pjm.PJMKorpus
++      params:
++        split_csv: data/splits/split_val_filtered.csv      # proper val split (no test peeking)
++        visual_features_path: features/vit_feat_pjm.h5
++        motion_features_path: features/mae_feat_pjm.h5
++        texts_path: features/texts_eng.h5
++        multilang_path: features/texts_multilang_pjm.h5
++        target_lang: English
++    test:
++      target: dataset.pjm.PJMKorpus
++      params:
++        split_csv: data/splits/split_test_filtered.csv
++        visual_features_path: features/vit_feat_pjm.h5
++        motion_features_path: features/mae_feat_pjm.h5
++        texts_path: features/texts_eng.h5
++        multilang_path: features/texts_multilang_pjm.h5
++        target_lang: English
+diff --git a/configs/eval_local_features.yaml b/configs/eval_local_features.yaml
+new file mode 100644
+index 0000000..298f53b
+--- /dev/null
++++ b/configs/eval_local_features.yaml
+@@ -0,0 +1,85 @@
++# Eval configa upstream SpaMo z naszymi (z Dropbox) features.
++# Empty postfixes: our spa_feat_p14t.zip / mo_feat_p14t.zip hold plain {fileid}.npy.
++# Validation/test = test (jak paper).
++model:
++  target: spamo.t5_slt.FlanT5SLT
++  params:
++    lr: 6.0e-4
++    monitor: val/bleu4
++    model_name: google/flan-t5-xl
++    cache_dir: null
++    inter_hidden: 768
++    input_size: 2048
++    beam_size: 5
++    max_frame_len: 512
++    max_txt_len: 64
++    frame_sample_rate: 1
++    prompt: "Translate the given sentence into {}."
++    tuning_type: lora
++    lora_r: 16
++    lora_alpha: 32
++    lora_dropout: 0.1
++    fusion_mode: joint
++    warm_up_steps: 0
++    cross_modal_align: true
++    combined_loss: true
++    alpha: 1.0
++    use_in_context: true
++    num_in_context: 3
++
++lightning:
++  callback:
++    learning_rate_logger:
++      target: pytorch_lightning.callbacks.LearningRateMonitor
++      params:
++        logging_interval: step
++  trainer:
++    accumulate_grad_batches: 2
++    accelerator: gpu
++    devices: 1
++    max_epochs: 500
++    gradient_clip_val: 1.0
++    check_val_every_n_epoch: 2
++    precision: bf16
++
++data:
++  target: dataset.datamodule.DataModuleFromConfig
++  params:
++    batch_size: 8
++    num_workers: 4
++    train:
++      target: dataset.p14t.Phoenix14T
++      params:
++        anno_root: ./preprocess/Phoenix14T
++        vid_root: ./dataset/Phoenix14T
++        feat_root: features/p14t/spatial
++        mae_feat_root: features/p14t/motion
++        mode: train
++        spatial: true
++        spatiotemporal: true
++        spatial_postfix: ''
++        spatiotemporal_postfix: ''
++    validation:
++      target: dataset.p14t.Phoenix14T
++      params:
++        anno_root: ./preprocess/Phoenix14T
++        vid_root: ./dataset/Phoenix14T
++        feat_root: features/p14t/spatial
++        mae_feat_root: features/p14t/motion
++        mode: test
++        spatial: true
++        spatiotemporal: true
++        spatial_postfix: ''
++        spatiotemporal_postfix: ''
++    test:
++      target: dataset.p14t.Phoenix14T
++      params:
++        anno_root: ./preprocess/Phoenix14T
++        vid_root: ./dataset/Phoenix14T
++        feat_root: features/p14t/spatial
++        mae_feat_root: features/p14t/motion
++        mode: test
++        spatial: true
++        spatiotemporal: true
++        spatial_postfix: ''
++        spatiotemporal_postfix: ''
+diff --git a/dataset/pjm.py b/dataset/pjm.py
+new file mode 100644
+index 0000000..c6ae1d0
+--- /dev/null
++++ b/dataset/pjm.py
+@@ -0,0 +1,113 @@
++"""
++PJM Korpus dataset adapter for upstream SpaMo (paper-faithful code).
++
++Wraps PJM HDF5 features (extracted in SpaMo-PJM fork) into the dict format
++expected by upstream `spamo.t5_slt.FlanT5SLT.get_inputs` (see t5_slt.py:331-410).
++
++Required sample dict fields:
++    pixel_value (Tensor [T, 2048]) : ViT spatial
++    glor_value  (Tensor [T, 1024]) : MAE motion (or list[Tensor])
++    text        (str)              : target sentence
++    gloss       (str)              : empty for PJM (no gloss annotations)
++    lang        (str)              : for prompt format, e.g. 'English'
++    id          (str)              : sample key
++    num_frames  (int)
++    en_text, fr_text, es_text (str): for in_context examples
++"""
++
++from pathlib import Path
++
++import h5py
++import pandas as pd
++import torch
++
++
++class PJMKorpus(torch.utils.data.Dataset):
++    def __init__(
++        self,
++        split_csv: str,
++        visual_features_path: str,
++        motion_features_path: str,
++        texts_path: str,
++        multilang_path: str | None = None,
++        target_lang: str = 'English',
++        drop_flagged: bool = False,
++        max_frame_length: int = 512,
++    ):
++        super().__init__()
++        df = pd.read_csv(split_csv)
++        if drop_flagged and 'flag' in df.columns:
++            df = df[df['flag'].fillna('') == '']
++        all_keys = df['key'].astype(str).tolist()
++
++        # TemporalConv conv_type=2 = [K5, P2, K5, P2]: requires >= ~16 input frames.
++        # Filter out PJM samples too short for the temporal encoder.
++        min_frames = 16
++        with h5py.File(visual_features_path, 'r') as f:
++            self.keys = [k for k in all_keys if k in f and f[k].shape[0] >= min_frames]
++        dropped = len(all_keys) - len(self.keys)
++        if dropped:
++            print(f"[PJMKorpus] {split_csv}: dropped {dropped} samples with < {min_frames} ViT frames")
++        self.visual_features_path = visual_features_path
++        self.motion_features_path = motion_features_path
++        self.texts_path = texts_path
++        self.multilang_path = multilang_path
++        self.target_lang = target_lang
++        self.max_frame_length = max_frame_length
++
++        self._vit = None
++        self._mae = None
++        self._texts = None
++        self._multilang = None
++
++    def _open(self):
++        if self._vit is None:
++            self._vit = h5py.File(self.visual_features_path, 'r')
++            self._mae = h5py.File(self.motion_features_path, 'r')
++            self._texts = h5py.File(self.texts_path, 'r')
++            self._multilang = h5py.File(self.multilang_path, 'r') if self.multilang_path else None
++
++    def __getitem__(self, idx: int) -> dict:
++        self._open()
++        key = self.keys[idx]
++        vit = torch.from_numpy(self._vit[key][()])
++        mae = torch.from_numpy(self._mae[key][()])
++
++        text = self._texts[key][()].decode().strip()
++        if not text.endswith('.'):
++            text += '.'
++
++        # Random crop spatial if too long (mirror PJMKorpus from SpaMo-PJM fork)
++        n = vit.size(0)
++        if n > self.max_frame_length:
++            import random
++            start = random.randint(0, n - self.max_frame_length)
++            vit = vit[start:start + self.max_frame_length]
++
++        out = {
++            'id': key,
++            'pixel_value': vit,
++            'num_frames': vit.size(0),
++            'glor_value': mae,
++            'text': text,
++            'gloss': '',  # PJM has no gloss annotations
++            'lang': self.target_lang,
++        }
++
++        # Multilang in-context (used when t5_slt.use_in_context=True)
++        if self._multilang is not None and key in self._multilang:
++            grp = self._multilang[key]
++            out['en_text'] = grp['en'][()].decode() if 'en' in grp else text
++            out['fr_text'] = grp['fr'][()].decode() if 'fr' in grp else text
++            out['es_text'] = grp['es'][()].decode() if 'es' in grp else text
++        else:
++            out['en_text'] = out['fr_text'] = out['es_text'] = text
++
++        return out
++
++    def __len__(self) -> int:
++        return len(self.keys)
++
++    @staticmethod
++    def collate_fn(batch):
++        return batch
+diff --git a/run_phoenix_si.sh b/run_phoenix_si.sh
+new file mode 100644
+index 0000000..47ea980
+--- /dev/null
++++ b/run_phoenix_si.sh
+@@ -0,0 +1,24 @@
++#!/bin/bash
++# SpaMo and Mod-SpaMo PHOENIX SI rerun on the filtered SI split, mirroring the MS lineage
++# (registered in the paper's facts.md on 2026-10-30). Starts when the final ensemble frees the GPU.
++set -euo pipefail
++export WANDB_MODE=offline
++exec >>"$HOME/SpaMo/run_phoenix_si.log" 2>&1
++while pgrep -f "[g]reedy_ens.py" >/dev/null; do sleep 60; done
++until [ "$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | head -1)" -lt 1024 ]; do sleep 30; done
++
++echo "start spamo si $(date)"
++cd "$HOME/SpaMo"
++.venv/bin/python main.py -c configs/finetune_pjm_si.yaml --ckpt spamo.ckpt -e bleu --patience 5 -n finetune_pjm_si_upstream
++best=$(ls -t logs/*_finetune_pjm_si_upstream/checkpoints/*.ckpt | head -1)
++echo "spamo si best $HOME/SpaMo/$best $(date)"
++
++cd "$HOME/SpaMo-PJM-4f11b72"
++py="$HOME/SpaMo-PJM/.venv/bin/python"
++"$py" main.py -c configs/si_v26_dual.yaml --ckpt "$HOME/SpaMo/$best" -t False --test True -n test_upstream_pjm_si_dual
++echo "start mod-spamo si $(date)"
++"$py" main.py -c configs/si_v27_quad.yaml --ckpt "$HOME/SpaMo/$best" -e bleu -n finetune_v27_quad_xattn_si_filtered
++mbest=$(ls -t logs/*_finetune_v27_quad_xattn_si_filtered/checkpoints/*.ckpt | head -1)
++echo "mod-spamo si best $mbest $(date)"
++"$py" main.py -c configs/si_v27_quad.yaml --ckpt "$mbest" -t False --test True -n test_v27_quad_si_filtered
++echo "end $(date)"
+diff --git a/run_eval_pipeline.sh b/run_eval_pipeline.sh
+new file mode 100755
+index 0000000..e78c9e7
+--- /dev/null
++++ b/run_eval_pipeline.sh
+@@ -0,0 +1,31 @@
++#!/usr/bin/env bash
++set -e
++cd "$(dirname "$0")"
++
++LOG="eval_pipeline.log"
++echo "[$(date)] === START ===" > "$LOG"
++
++# 1. Install deps (idempotent: uv pip skips already installed)
++echo "[$(date)] installing deps..." >> "$LOG"
++uv pip install --python .venv/bin/python -r requirements.txt >> "$LOG" 2>&1
++
++# 2. Verify torch + lightning + transformers present
++echo "[$(date)] verifying imports..." >> "$LOG"
++.venv/bin/python -c "
++import torch, pytorch_lightning, transformers, peft
++print('torch', torch.__version__)
++print('pl', pytorch_lightning.__version__)
++print('transformers', transformers.__version__)
++print('peft', peft.__version__)
++print('cuda', torch.cuda.is_available(), torch.cuda.device_count())
++" >> "$LOG" 2>&1
++
++# 3. Run eval: upstream code, official ckpt, our features
++echo "[$(date)] running eval..." >> "$LOG"
++.venv/bin/python main.py \
++    -c configs/eval_local_features.yaml \
++    --ckpt spamo.ckpt \
++    --train False --test True -e bleu \
++    -n eval_upstream_groundtruth >> "$LOG" 2>&1
++
++echo "[$(date)] === DONE ===" >> "$LOG"

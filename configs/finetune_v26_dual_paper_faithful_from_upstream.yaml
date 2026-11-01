@@ -1,5 +1,5 @@
 # v26 — DUAL paper-faithful continuation z upstream PJM-MS dual ckpt (BLEU 5.36 dev / 5.46 test).
-# Init: /home/croco/SpaMo/logs/2026-05-02T08-39-04_finetune_pjm_ms_upstream_v2/checkpoints/epoch=00043-step=0129844-bleu4=5.36.ckpt
+# Init: SpaMo PHOENIX-2014T MS checkpoint, CrocoSign/pjm-models checkpoints/spamo/spamo-pjm-phoenix-ms/epoch=00043-step=0129844-bleu4=5.36.ckpt
 # Architektura matching upstream (dual ViT+MAE) — żaden new_stream nie destabilizuje fusion.
 # Test: czy fork code z paper-config dorówna upstream (czy always-on differences typu
 # encoder.last_hidden_state.mean dla contrastive realnie szkodzą, czy są neutralne).
@@ -10,7 +10,7 @@ model:
     fusion_lr: 1.0e-5       # trained projektory soft-freeze
     monitor: val/bleu4
     model_name: google/flan-t5-xl
-    cache_dir: /home/croco/.cache/huggingface/hub
+    cache_dir: null
     inter_hidden: 768
     input_size: 2048
     beam_size: 5
@@ -70,9 +70,9 @@ data:
     texts_path: features/texts_eng.h5
     multilang_path: features/texts_multilang_pjm.h5
     target_lang: English
-    train_split_path: /home/croco/CrocoSign/data/split_train_ms.csv
-    val_split_path: /home/croco/CrocoSign/data/split_val_ms.csv
-    test_split_path: /home/croco/CrocoSign/data/split_test_ms.csv
+    train_split_path: data/splits/split_train_ms.csv
+    val_split_path: data/splits/split_val_ms.csv
+    test_split_path: data/splits/split_test_ms.csv
     device: cuda
     max_frame_length: 512
     set_to_test: test
