@@ -29,7 +29,11 @@ import h5py
 import lmdb
 import mediapipe as mp
 from mediapipe.tasks import python as mp_tasks
-from mediapipe.tasks.python.vision import HandLandmarker, HandLandmarkerOptions, RunningMode
+from mediapipe.tasks.python.vision import (
+    HandLandmarker,
+    HandLandmarkerOptions,
+    RunningMode,
+)
 import msgpack
 import numpy as np
 import torch
@@ -44,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 HAND_CROP_PAD = 0.25
 FEAT_DIM = 2048
-QUEUE_MAXSIZE = 128   # max buffered videos between CPU and GPU
+QUEUE_MAXSIZE = 128  # max buffered videos between CPU and GPU
 
 
 def get_video_frames(video_bytes: bytes) -> list:
@@ -53,11 +57,17 @@ def get_video_frames(video_bytes: bytes) -> list:
     return [frame.to_image() for frame in container.decode(stream)]
 
 
-def crop_frame(image: Image.Image, crop_params: dict, output_size=(224, 224)) -> Image.Image:
-    cropped = image.crop((
-        crop_params["x_start"], crop_params["y_start"],
-        crop_params["x_end"],   crop_params["y_end"],
-    ))
+def crop_frame(
+    image: Image.Image, crop_params: dict, output_size=(224, 224)
+) -> Image.Image:
+    cropped = image.crop(
+        (
+            crop_params["x_start"],
+            crop_params["y_start"],
+            crop_params["x_end"],
+            crop_params["y_end"],
+        )
+    )
     return resize_and_pad(cropped, output_size)
 
 
@@ -68,8 +78,12 @@ def hand_bbox(landmarks, img_w: int, img_h: int, pad: float = HAND_CROP_PAD):
     y1, y2 = min(ys), max(ys)
     pw = (x2 - x1) * pad
     ph = (y2 - y1) * pad
-    return (int(max(0, x1 - pw)), int(max(0, y1 - ph)),
-            int(min(img_w, x2 + pw)), int(min(img_h, y2 + ph)))
+    return (
+        int(max(0, x1 - pw)),
+        int(max(0, y1 - ph)),
+        int(min(img_w, x2 + pw)),
+        int(min(img_h, y2 + ph)),
+    )
 
 
 def iter_tar_names(tars_dir: str, tar_names: list):
@@ -84,27 +98,51 @@ def iter_tar_names(tars_dir: str, tar_names: list):
                     yield key, f.read()
 
 
-def cpu_worker(worker_id: int, tar_names: list, tars_dir: str,
-               crop_params_path: str, out_queue: Queue, already_done: set,
-               hand_model_path: str):
+def cpu_worker(
+    worker_id: int,
+    tar_names: list,
+    tars_dir: str,
+    crop_params_path: str,
+    out_queue: Queue,
+    already_done: set,
+    hand_model_path: str,
+):
     """CPU worker: detects hand crops and puts numpy arrays into the queue."""
     log = logging.getLogger(f"cpu-{worker_id}")
     try:
-        _cpu_worker_inner(worker_id, tar_names, tars_dir, crop_params_path, out_queue, already_done, log,
-                          hand_model_path)
+        _cpu_worker_inner(
+            worker_id,
+            tar_names,
+            tars_dir,
+            crop_params_path,
+            out_queue,
+            already_done,
+            log,
+            hand_model_path,
+        )
     except Exception as e:
         log.error(f"Worker {worker_id} crashed: {e}")
     finally:
         out_queue.put(("done", worker_id))
 
 
-def _cpu_worker_inner(worker_id, tar_names, tars_dir, crop_params_path, out_queue, already_done, log,
-                      hand_model_path):
-    hands_detector = HandLandmarker.create_from_options(HandLandmarkerOptions(
-        base_options=mp_tasks.BaseOptions(model_asset_path=hand_model_path),
-        num_hands=2,
-        running_mode=RunningMode.IMAGE,
-    ))
+def _cpu_worker_inner(
+    worker_id,
+    tar_names,
+    tars_dir,
+    crop_params_path,
+    out_queue,
+    already_done,
+    log,
+    hand_model_path,
+):
+    hands_detector = HandLandmarker.create_from_options(
+        HandLandmarkerOptions(
+            base_options=mp_tasks.BaseOptions(model_asset_path=hand_model_path),
+            num_hands=2,
+            running_mode=RunningMode.IMAGE,
+        )
+    )
     lmdb_env = lmdb.open(crop_params_path, readonly=True, lock=False)
 
     for key, mp4_bytes in iter_tar_names(tars_dir, tar_names):
@@ -119,7 +157,7 @@ def _cpu_worker_inner(worker_id, tar_names, tars_dir, crop_params_path, out_queu
                 raise ValueError(f"No crop params for {key}")
             crop_params = msgpack.unpackb(raw)
 
-            crops_list = []   # flat list of np.ndarray [H, W, 3]
+            crops_list = []  # flat list of np.ndarray [H, W, 3]
             frame_sizes = []  # number of hand crops per frame
             for frame in frames:
                 cropped = crop_frame(frame, crop_params)
@@ -149,8 +187,10 @@ def _cpu_worker_inner(worker_id, tar_names, tars_dir, crop_params_path, out_queu
 @torch.no_grad()
 def encode_crops(crops: list, processor, model, device: str) -> np.ndarray:
     inputs = processor(images=crops, return_tensors="pt").to(device)
-    hidden = model(**inputs, output_hidden_states=True).hidden_states[-1]  # [N, seq, 1024]
-    cls = hidden[:, 0]               # [N, 1024]
+    hidden = model(**inputs, output_hidden_states=True).hidden_states[
+        -1
+    ]  # [N, seq, 1024]
+    cls = hidden[:, 0]  # [N, 1024]
     patch_mean = hidden[:, 1:].mean(1)  # [N, 1024]
     return torch.cat([cls, patch_mean], dim=-1).float().cpu().numpy()  # [N, 2048]
 
@@ -158,10 +198,18 @@ def encode_crops(crops: list, processor, model, device: str) -> np.ndarray:
 def gpu_writer(out_queue: Queue, n_workers: int, args, processed: set):
     """Main process: encodes hand crops with ViT, writes results to H5."""
     logger.info("Loading CLIP ViT-L/14...")
-    processor = AutoImageProcessor.from_pretrained(args.model_name, cache_dir=args.cache_dir)
-    vit = CLIPVisionModel.from_pretrained(
-        args.model_name, output_hidden_states=True, cache_dir=args.cache_dir,
-    ).to(args.device).eval()
+    processor = AutoImageProcessor.from_pretrained(
+        args.model_name, cache_dir=args.cache_dir
+    )
+    vit = (
+        CLIPVisionModel.from_pretrained(
+            args.model_name,
+            output_hidden_states=True,
+            cache_dir=args.cache_dir,
+        )
+        .to(args.device)
+        .eval()
+    )
     logger.info("Model loaded. GPU writer ready.")
 
     zero_feat = np.zeros(FEAT_DIM, dtype=np.float32)
@@ -173,7 +221,10 @@ def gpu_writer(out_queue: Queue, n_workers: int, args, processed: set):
 
     with h5py.File(args.output, "a") as hf:
         hf.attrs.setdefault("feat_dim", FEAT_DIM)
-        hf.attrs.setdefault("description", "CLIP ViT-L/14 on hand crops, mean-pooled L+R, zero if no detection")
+        hf.attrs.setdefault(
+            "description",
+            "CLIP ViT-L/14 on hand crops, mean-pooled L+R, zero if no detection",
+        )
 
         while done_workers < n_workers:
             item = out_queue.get()
@@ -203,7 +254,7 @@ def gpu_writer(out_queue: Queue, n_workers: int, args, processed: set):
                 all_pil = [Image.fromarray(c) for c in crops_list]
                 all_feats = []
                 for i in range(0, len(all_pil), args.batch_size):
-                    batch = all_pil[i:i + args.batch_size]
+                    batch = all_pil[i : i + args.batch_size]
                     all_feats.append(encode_crops(batch, processor, vit, args.device))
                 all_feats = np.concatenate(all_feats, axis=0)
             else:
@@ -213,7 +264,7 @@ def gpu_writer(out_queue: Queue, n_workers: int, args, processed: set):
             idx = 0
             for n in frame_sizes:
                 if n > 0:
-                    video_feats.append(all_feats[idx:idx + n].mean(axis=0))
+                    video_feats.append(all_feats[idx : idx + n].mean(axis=0))
                     idx += n
                 else:
                     video_feats.append(zero_feat)
@@ -227,13 +278,17 @@ def gpu_writer(out_queue: Queue, n_workers: int, args, processed: set):
             if newly % args.flush_every == 0:
                 hf.flush()
                 elapsed = time.time() - start
-                logger.info(f"{newly + len(processed)}/{newly + skipped + len(processed)} | {elapsed/60:.1f}min")
+                logger.info(
+                    f"{newly + len(processed)}/{newly + skipped + len(processed)} | {elapsed / 60:.1f}min"
+                )
 
         hf.flush()
 
     pbar.close()
     elapsed = time.time() - start
-    logger.info(f"Done. Newly: {newly:,} | Errors: {errors} | Time: {elapsed/60:.1f} min")
+    logger.info(
+        f"Done. Newly: {newly:,} | Errors: {errors} | Time: {elapsed / 60:.1f} min"
+    )
 
 
 def main():
@@ -246,16 +301,28 @@ def main():
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--flush-every", type=int, default=500)
-    parser.add_argument("--num-workers", type=int, default=max(1, os.cpu_count() - 2),
-                        help="CPU workers for MediaPipe detection (default: nproc-2)")
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=max(1, os.cpu_count() - 2),
+        help="CPU workers for MediaPipe detection (default: nproc-2)",
+    )
     parser.add_argument("--hand-model", default="models/hand_landmarker.task")
-    parser.add_argument("--dry-run", action="store_true", help="Count videos and exit without processing")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Count videos and exit without processing",
+    )
     args = parser.parse_args()
 
     all_tars = sorted(f for f in os.listdir(args.tars_dir) if f.endswith(".tar"))
 
     total = sum(
-        sum(1 for m in tarfile.open(os.path.join(args.tars_dir, f)).getmembers() if m.name.endswith(".mp4"))
+        sum(
+            1
+            for m in tarfile.open(os.path.join(args.tars_dir, f)).getmembers()
+            if m.name.endswith(".mp4")
+        )
         for f in all_tars
     )
     logger.info(f"Total videos: {total:,}")
@@ -274,7 +341,7 @@ def main():
         return
 
     # Split tars across CPU workers (round-robin)
-    chunks = [all_tars[i::args.num_workers] for i in range(args.num_workers)]
+    chunks = [all_tars[i :: args.num_workers] for i in range(args.num_workers)]
     out_queue = Queue(maxsize=QUEUE_MAXSIZE)
 
     # Spawn CPU workers first — before any CUDA init in this process
@@ -282,8 +349,15 @@ def main():
     for i, chunk in enumerate(chunks):
         p = Process(
             target=cpu_worker,
-            args=(i, chunk, args.tars_dir, args.crop_params_path, out_queue, processed,
-                  args.hand_model),
+            args=(
+                i,
+                chunk,
+                args.tars_dir,
+                args.crop_params_path,
+                out_queue,
+                processed,
+                args.hand_model,
+            ),
             daemon=True,
         )
         p.start()

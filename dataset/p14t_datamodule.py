@@ -30,7 +30,7 @@ class Phoenix14TQuad(torch.utils.data.Dataset):
         keypoint_features_path: str | None = None,
         aux_features_path: str | None = None,
         max_frame_length: int = 512,
-        text_field: str = 'en_text',
+        text_field: str = "en_text",
     ):
         super().__init__()
         anno = np.load(anno_path, allow_pickle=True).item()
@@ -50,7 +50,7 @@ class Phoenix14TQuad(torch.utils.data.Dataset):
         def _intersect(curr, path):
             if not path or not Path(path).exists():
                 return curr
-            with h5py.File(path, 'r') as f:
+            with h5py.File(path, "r") as f:
                 ks = set(f.keys())
             return ks if curr is None else curr & ks
 
@@ -60,7 +60,7 @@ class Phoenix14TQuad(torch.utils.data.Dataset):
         self.entries = []
         for i in sorted(k for k in anno.keys() if isinstance(k, int)):
             d = anno[i]
-            fid = d['fileid']
+            fid = d["fileid"]
             if not (self.spatial_root / f"{fid}.npy").exists():
                 continue
             if not (self.motion_root / f"{fid}.npy").exists():
@@ -75,14 +75,14 @@ class Phoenix14TQuad(torch.utils.data.Dataset):
 
     def _open_h5(self):
         if self.keypoint_features_path and self._kp_h5 is None:
-            self._kp_h5 = h5py.File(self.keypoint_features_path, 'r')
+            self._kp_h5 = h5py.File(self.keypoint_features_path, "r")
         if self.aux_features_path and self._aux_h5 is None:
-            self._aux_h5 = h5py.File(self.aux_features_path, 'r')
+            self._aux_h5 = h5py.File(self.aux_features_path, "r")
 
     def __getitem__(self, idx: int) -> dict:
         self._open_h5()
         d = self.entries[idx]
-        fid = d['fileid']
+        fid = d["fileid"]
 
         vit = torch.from_numpy(np.load(self.spatial_root / f"{fid}.npy"))
         mae = torch.from_numpy(np.load(self.motion_root / f"{fid}.npy"))
@@ -91,7 +91,7 @@ class Phoenix14TQuad(torch.utils.data.Dataset):
         n = vit.size(0)
         if n > self.max_frame_length:
             start = random.randint(0, n - self.max_frame_length)
-            vit = vit[start:start + self.max_frame_length]
+            vit = vit[start : start + self.max_frame_length]
 
         kp = None
         if self._kp_h5 is not None and fid in self._kp_h5:
@@ -101,25 +101,25 @@ class Phoenix14TQuad(torch.utils.data.Dataset):
         if self._aux_h5 is not None and fid in self._aux_h5:
             aux = torch.from_numpy(self._aux_h5[fid][()])
 
-        text = (d.get(self.text_field) or d['text']).strip()
-        if not text.endswith('.'):
-            text += '.'
+        text = (d.get(self.text_field) or d["text"]).strip()
+        if not text.endswith("."):
+            text += "."
 
         # use_in_context=True path in t5_slt.py:413-419 reads en_text/fr_text/es_text
         # off the sample. Pass them through verbatim if present in annotations.
         return {
-            'id': fid,
-            'pixel_value': vit,
-            'num_frames': vit.size(0),
-            'glor_value': mae,
-            'keypoint_value': kp,
-            'aux_value': aux,
-            'text': text,
-            'en_text': d.get('en_text', text),
-            'fr_text': d.get('fr_text', text),
-            'es_text': d.get('es_text', text),
-            'lang': 'German',
-            'speaker_id': d.get('signer', 'unknown'),
+            "id": fid,
+            "pixel_value": vit,
+            "num_frames": vit.size(0),
+            "glor_value": mae,
+            "keypoint_value": kp,
+            "aux_value": aux,
+            "text": text,
+            "en_text": d.get("en_text", text),
+            "fr_text": d.get("fr_text", text),
+            "es_text": d.get("es_text", text),
+            "lang": "German",
+            "speaker_id": d.get("signer", "unknown"),
         }
 
     def __len__(self) -> int:
@@ -136,14 +136,14 @@ class Phoenix14TDataModule(pl.LightningDataModule):
         anno_root: str,
         spatial_root: str,
         motion_root: str,
-        device: str = 'cuda',
+        device: str = "cuda",
         max_frame_length: int = 512,
         batch_size: int = 4,
         num_workers: int = 4,
-        set_to_test: str = 'test',
+        set_to_test: str = "test",
         keypoint_features_path: str | None = None,
         aux_features_path: str | None = None,
-        text_field: str = 'en_text',
+        text_field: str = "en_text",
     ):
         super().__init__()
         self.anno_root = Path(anno_root)
@@ -170,9 +170,9 @@ class Phoenix14TDataModule(pl.LightningDataModule):
         )
 
     def setup(self, stage=None):
-        self.train_set = self._make('train')
-        self.val_set = self._make('dev')
-        self.test_set = self._make('test')
+        self.train_set = self._make("train")
+        self.val_set = self._make("dev")
+        self.test_set = self._make("test")
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(
@@ -193,7 +193,7 @@ class Phoenix14TDataModule(pl.LightningDataModule):
         )
 
     def test_dataloader(self):
-        ds = {'train': self.train_set, 'val': self.val_set, 'test': self.test_set}.get(
+        ds = {"train": self.train_set, "val": self.val_set, "test": self.test_set}.get(
             self.set_to_test, self.val_set
         )
         return torch.utils.data.DataLoader(
@@ -205,15 +205,23 @@ class Phoenix14TDataModule(pl.LightningDataModule):
         )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     dm = Phoenix14TDataModule(
-        anno_root='preprocess/Phoenix14T',
-        spatial_root='features/p14t/spatial',
-        motion_root='features/p14t/motion',
+        anno_root="preprocess/Phoenix14T",
+        spatial_root="features/p14t/spatial",
+        motion_root="features/p14t/motion",
         batch_size=2,
         num_workers=0,
     )
     dm.setup()
-    print(f"train: {len(dm.train_set)} | dev: {len(dm.val_set)} | test: {len(dm.test_set)}")
+    print(
+        f"train: {len(dm.train_set)} | dev: {len(dm.val_set)} | test: {len(dm.test_set)}"
+    )
     sample = dm.train_set[0]
-    print({k: (tuple(v.shape) if torch.is_tensor(v) else v) for k, v in sample.items() if v is not None})
+    print(
+        {
+            k: (tuple(v.shape) if torch.is_tensor(v) else v)
+            for k, v in sample.items()
+            if v is not None
+        }
+    )

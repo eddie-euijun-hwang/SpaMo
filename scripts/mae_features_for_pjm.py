@@ -21,7 +21,7 @@ from utils.log import get_error_logger
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-error_logger = get_error_logger('mae_features_extract_errors.log')
+error_logger = get_error_logger("mae_features_extract_errors.log")
 
 _GLOBAL_SEED = 0
 np.random.seed(_GLOBAL_SEED)
@@ -51,7 +51,9 @@ class VideoMAEFeatureReader(object):
 
     @torch.no_grad()
     def get_feats(self, chunk_batch):
-        inputs = self.image_processor(images=chunk_batch, return_tensors="pt").to(self.device)  # type: ignore
+        inputs = self.image_processor(images=chunk_batch, return_tensors="pt").to(
+            self.device
+        )  # type: ignore
 
         outputs = self.model(**inputs, output_hidden_states=True).hidden_states
 
@@ -98,12 +100,14 @@ def get_parser():
         help="dataset split to process",
         type=str,
         default="train",
-        choices=["train"], #["train", "val", "test"]
+        choices=["train"],  # ["train", "val", "test"]
     )
     return parser
 
 
-def get_iterator_for_pjm(args, split: str = "train", skip_ids: set = None) -> tuple[Callable, int]:
+def get_iterator_for_pjm(
+    args, split: str = "train", skip_ids: set = None
+) -> tuple[Callable, int]:
     batch_size = args.batch_size
     logger.info(f"Loading dataset: {args.dataset_path}, split: {split}")
     dataset = datasets.load_dataset(
@@ -112,10 +116,10 @@ def get_iterator_for_pjm(args, split: str = "train", skip_ids: set = None) -> tu
     num = len(dataset)
 
     logger.info(f"Dataset loaded: {num} videos")
-    
+
     if skip_ids:
         logger.info(f"Will skip {len(skip_ids)} already processed videos")
-    
+
     logger.info(f"Opening LMDB crop params: {args.crop_params_path}")
     lmdb_env = lmdb.open(args.crop_params_path, readonly=True, lock=False)
     converter = ImageConverter(lmdb_env, (224, 224))
@@ -128,7 +132,6 @@ def get_iterator_for_pjm(args, split: str = "train", skip_ids: set = None) -> tu
         cache_dir=args.cache_dir,
     )
 
-
     def iterate():
         skipped_count = 0
         processed_count = 0
@@ -138,11 +141,11 @@ def get_iterator_for_pjm(args, split: str = "train", skip_ids: set = None) -> tu
         for rec in dataset:
             try:
                 video_id = rec["__key__"]
-                
+
                 if skip_ids and video_id in skip_ids:
                     skipped_count += 1
                     continue
-                
+
                 frames = get_video_frames(rec["mp4"])
                 if not frames:
                     raise Exception("No frames found")
@@ -175,29 +178,36 @@ def get_iterator_for_pjm(args, split: str = "train", skip_ids: set = None) -> tu
                 )  # For now None, maybe in the future start time
             except Exception:
                 error_count += 1
-                failed_video_id = rec['__key__']
+                failed_video_id = rec["__key__"]
                 error_logger.exception(f"extract features error for {failed_video_id}")
             finally:
                 pbar.update(1)
-                pbar.set_postfix({'processed': processed_count, 'skipped': skipped_count, 'errors': error_count})
-        
+                pbar.set_postfix(
+                    {
+                        "processed": processed_count,
+                        "skipped": skipped_count,
+                        "errors": error_count,
+                    }
+                )
+
         lmdb_env.close()
         if skipped_count > 0:
             logger.info(f"Skipped {skipped_count} videos total")
         logger.info(f"Successfully processed {processed_count} videos")
-        logger.info(f'failed videos: {error_count}')
+        logger.info(f"failed videos: {error_count}")
 
     return iterate, num
 
 
 def save_hdf5(save_in_every: int = 500):
     import time
+
     start_time = time.time()
-    
+
     parser = get_parser()
     args = parser.parse_args()
-    split = args.split 
-    
+    split = args.split
+
     logger.info("=" * 60)
     logger.info("MAE Feature Extraction Started")
     logger.info("=" * 60)
@@ -209,21 +219,21 @@ def save_hdf5(save_in_every: int = 500):
     logger.info(f"  Split: {split}")
     logger.info(f"  Output directory: {args.save_dir}")
     logger.info("=" * 60)
-    
+
     output_file = osp.join(args.save_dir, f"mae_feat_pjm_{split}.h5")
-    
+
     processed_ids = set()
     if osp.exists(output_file):
         logger.info(f"Found existing file: {output_file}")
-        with h5py.File(output_file, 'r') as existing:
+        with h5py.File(output_file, "r") as existing:
             processed_ids = set(existing.keys())
         logger.info(f"Resuming: {len(processed_ids)} videos already processed")
     else:
         logger.info(f"Will save to: {output_file}")
-    
+
     generator, num = get_iterator_for_pjm(args, split=split, skip_ids=processed_ids)
     iterator = generator()
-    
+
     if processed_ids:
         logger.info(f"Remaining: {num - len(processed_ids)} videos to process")
     else:
@@ -254,11 +264,13 @@ def save_hdf5(save_in_every: int = 500):
             newly_processed += 1
             if newly_processed % save_in_every == 0:
                 f.flush()
-                logger.info(f"Flushed at {len(processed_ids) + newly_processed}/{num} videos")
+                logger.info(
+                    f"Flushed at {len(processed_ids) + newly_processed}/{num} videos"
+                )
         f.flush()
-        
+
         logger.info(f"Newly processed {newly_processed} videos")
-        
+
     elapsed_time = time.time() - start_time
     total_in_file = len(processed_ids) + newly_processed
     logger.info("=" * 60)
@@ -266,14 +278,15 @@ def save_hdf5(save_in_every: int = 500):
     logger.info(f"  Total videos in output file: {total_in_file}/{num}")
     logger.info(f"  Newly processed in this run: {newly_processed}")
     logger.info(f"  Output file: {output_file}")
-    logger.info(f"  Total time: {elapsed_time:.2f}s ({elapsed_time/60:.2f} min)")
+    logger.info(f"  Total time: {elapsed_time:.2f}s ({elapsed_time / 60:.2f} min)")
     if newly_processed > 0:
-        logger.info(f"  Average time per video: {elapsed_time/newly_processed:.2f}s")
+        logger.info(f"  Average time per video: {elapsed_time / newly_processed:.2f}s")
     logger.info("=" * 60)
 
 
 def main():
     save_hdf5(save_in_every=500)
+
 
 if __name__ == "__main__":
     main()

@@ -6,6 +6,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 from spamo.clip_loss import clip_loss
 
+
 class PJMTranslator(pl.LightningModule):
     def __init__(
         self,
@@ -44,17 +45,25 @@ class PJMTranslator(pl.LightningModule):
     def _get_t5_tokenizer(self):
         tokenizer = getattr(self.t5_generator, "tokenizer", None)
         if tokenizer is None:
-            raise ValueError("t5_generator must expose a tokenizer for contrastive loss.")
+            raise ValueError(
+                "t5_generator must expose a tokenizer for contrastive loss."
+            )
         return tokenizer
 
     def _lengths_to_mask(self, lengths: torch.Tensor, max_len: int) -> torch.Tensor:
-        return torch.arange(max_len, device=lengths.device).unsqueeze(0) < lengths.unsqueeze(1)
+        return torch.arange(max_len, device=lengths.device).unsqueeze(
+            0
+        ) < lengths.unsqueeze(1)
 
-    def _mean_pool_by_mask(self, features: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def _mean_pool_by_mask(
+        self, features: torch.Tensor, mask: torch.Tensor
+    ) -> torch.Tensor:
         mask = mask.unsqueeze(-1).to(features.dtype)
         return (features * mask).sum(dim=1) / mask.sum(dim=1).clamp_min(1.0)
 
-    def _contrastive_loss(self, pred_embeddings: torch.Tensor, pred_lengths: torch.Tensor, texts):
+    def _contrastive_loss(
+        self, pred_embeddings: torch.Tensor, pred_lengths: torch.Tensor, texts
+    ):
         pred_mask = self._lengths_to_mask(pred_lengths, pred_embeddings.shape[1])
         pred_pooled = self._mean_pool_by_mask(pred_embeddings, pred_mask)
 
@@ -77,17 +86,21 @@ class PJMTranslator(pl.LightningModule):
         logits_per_text = torch.matmul(text_pooled, pred_pooled.t()) * logit_scale
 
         return clip_loss(logits_per_text)
-        
+
     def shared_step(self, batch, split: str):
         visual_features, motion_features, true_text = batch
-        pred_embeddings, pred_lengths = self.fusion_module(visual_features, motion_features)
+        pred_embeddings, pred_lengths = self.fusion_module(
+            visual_features, motion_features
+        )
 
         log_dict = {}
 
         if self.combined_loss:
             t5_output = self.t5_generator((pred_embeddings, pred_lengths, true_text))
             if t5_output.loss is None:
-                raise ValueError("t5_generator returned no loss for combined loss mode.")
+                raise ValueError(
+                    "t5_generator returned no loss for combined loss mode."
+                )
             t5_loss = t5_output.loss
             cont_loss = self._contrastive_loss(pred_embeddings, pred_lengths, true_text)
             loss = t5_loss + self.alpha * cont_loss
@@ -119,7 +132,9 @@ class PJMTranslator(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        return torch.optim.AdamW(
+            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
+        )
 
 
 def build_callbacks(
@@ -161,4 +176,3 @@ def build_wandb_logger(
         save_dir=save_dir,
         log_model=True,
     )
-

@@ -80,17 +80,17 @@ def run_with_timeout(fn_name: str, payload: list[Any], timeout: float):
 
 # ---------- pathological cases ----------
 CASES: list[tuple[str, list[Any]]] = [
-    ("two equal strings",                 ["A", "A"]),
-    ("majority duplicate",                ["A", "A", "B"]),
-    ("two empty strings + one value",     ["", "", "X"]),
-    ("three identical",                   ["A", "A", "A"]),
-    ("4 elements, value count > n/2",     ["A", "A", "A", "B"]),
-    ("two empties at edge of batch",      ["de1", "", ""]),
+    ("two equal strings", ["A", "A"]),
+    ("majority duplicate", ["A", "A", "B"]),
+    ("two empty strings + one value", ["", "", "X"]),
+    ("three identical", ["A", "A", "A"]),
+    ("4 elements, value count > n/2", ["A", "A", "A", "B"]),
+    ("two empties at edge of batch", ["de1", "", ""]),
     # well-behaved cases to show fix doesn't regress
-    ("all distinct, n=3 (OK)",            ["A", "B", "C"]),
-    ("all distinct, n=8 (OK)",            list("ABCDEFGH")),
-    ("singleton (no-op)",                 ["only"]),
-    ("empty list (no-op)",                []),
+    ("all distinct, n=3 (OK)", ["A", "B", "C"]),
+    ("all distinct, n=8 (OK)", list("ABCDEFGH")),
+    ("singleton (no-op)", ["only"]),
+    ("empty list (no-op)", []),
 ]
 
 
@@ -112,18 +112,22 @@ def main():
         if buggy_out == "HUNG":
             buggy_str = f"HUNG (>{TIMEOUT_SECONDS:.0f}s)"
         else:
-            buggy_str = f"ok in {buggy_dt*1000:.2f}ms"
+            buggy_str = f"ok in {buggy_dt * 1000:.2f}ms"
 
         if fixed_out == "HUNG":
             fixed_str = f"HUNG (>{TIMEOUT_SECONDS:.0f}s)"
         else:
-            fixed_str = f"ok in {fixed_dt*1000:.2f}ms"
+            fixed_str = f"ok in {fixed_dt * 1000:.2f}ms"
 
-        print(f"{label:<38} | {fmt_case(payload):<42} | {buggy_str:<22} | {fixed_str:<22}")
+        print(
+            f"{label:<38} | {fmt_case(payload):<42} | {buggy_str:<22} | {fixed_str:<22}"
+        )
 
     print()
     print("Buggy version hangs whenever no permutation has all positions differing")
-    print("by VALUE (Hall's condition: any value present in > n/2 positions blocks it).")
+    print(
+        "by VALUE (Hall's condition: any value present in > n/2 positions blocks it)."
+    )
     print("Fixed version checks position equality instead, which is always solvable")
     print("for n >= 2; cyclic-shift fallback bounds worst case.")
 

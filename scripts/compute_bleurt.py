@@ -1,4 +1,5 @@
 """Post-hoc BLEURT-20 over a `test_outputs.txt` dump (Reference:/Generated: blocks)."""
+
 import argparse
 import json
 import re
@@ -26,14 +27,24 @@ def parse_dump(path: Path) -> tuple[list[str], list[str]]:
 
 
 @torch.inference_mode()
-def score(refs: list[str], gens: list[str], device: str, batch_size: int) -> list[float]:
+def score(
+    refs: list[str], gens: list[str], device: str, batch_size: int
+) -> list[float]:
     tokenizer = BleurtSPTokenizer.from_pretrained(MODEL)
-    model = BleurtForSequenceClassification.from_pretrained(MODEL, config=BleurtConfig.from_pretrained(MODEL))
+    model = BleurtForSequenceClassification.from_pretrained(
+        MODEL, config=BleurtConfig.from_pretrained(MODEL)
+    )
     model.eval().to(device)
     out = []
     for i in range(0, len(refs), batch_size):
-        enc = tokenizer(refs[i:i + batch_size], gens[i:i + batch_size],
-                        padding=True, truncation=True, max_length=512, return_tensors="pt").to(device)
+        enc = tokenizer(
+            refs[i : i + batch_size],
+            gens[i : i + batch_size],
+            padding=True,
+            truncation=True,
+            max_length=512,
+            return_tensors="pt",
+        ).to(device)
         out.extend(model(**enc).logits.squeeze(-1).float().cpu().tolist())
     return out
 
@@ -51,7 +62,9 @@ def main() -> None:
     print(f"BLEURT-20 mean: {mean:.4f}  (n={len(scores)})")
 
     out_path = args.dump.parent / "bleurt_BLEURT-20.json"
-    out_path.write_text(json.dumps({"n": len(scores), "mean": mean, "per_sample": scores}))
+    out_path.write_text(
+        json.dumps({"n": len(scores), "mean": mean, "per_sample": scores})
+    )
 
 
 if __name__ == "__main__":

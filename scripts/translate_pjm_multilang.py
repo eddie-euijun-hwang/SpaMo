@@ -43,7 +43,9 @@ logger = logging.getLogger(__name__)
 @torch.no_grad()
 def batch_translate(texts, tokenizer, model, src_lang, tgt_lang, device, max_len=128):
     tokenizer.src_lang = src_lang
-    inputs = tokenizer(texts, return_tensors="pt", padding=True, truncation=True, max_length=max_len).to(device)
+    inputs = tokenizer(
+        texts, return_tensors="pt", padding=True, truncation=True, max_length=max_len
+    ).to(device)
     forced_bos = tokenizer.convert_tokens_to_ids(tgt_lang)
     out = model.generate(
         **inputs,
@@ -61,13 +63,19 @@ def main():
     p.add_argument("--output", default="features/texts_multilang_pjm.h5")
     p.add_argument("--model", default="facebook/nllb-200-distilled-600M")
     p.add_argument("--cache-dir", default="/home/croco/.cache/huggingface/hub")
-    p.add_argument("--device", default="cpu", help="cpu (default — GPU zajęte) lub cuda:0")
+    p.add_argument(
+        "--device", default="cpu", help="cpu (default — GPU zajęte) lub cuda:0"
+    )
     p.add_argument("--batch-size", type=int, default=32)
     args = p.parse_args()
 
     logger.info(f"Loading {args.model} on {args.device}...")
     tokenizer = AutoTokenizer.from_pretrained(args.model, cache_dir=args.cache_dir)
-    model = AutoModelForSeq2SeqLM.from_pretrained(args.model, cache_dir=args.cache_dir).to(args.device).eval()
+    model = (
+        AutoModelForSeq2SeqLM.from_pretrained(args.model, cache_dir=args.cache_dir)
+        .to(args.device)
+        .eval()
+    )
     if args.device.startswith("cuda"):
         model = model.half()
     logger.info("Model loaded.")
@@ -79,7 +87,9 @@ def main():
     # Source for translation = English (texts_eng.h5). Iterate over EN keys; PL fetched if present.
     all_keys = sorted(en_h5.keys())
     todo = [k for k in all_keys if k not in out_h5]
-    logger.info(f"Total EN keys: {len(all_keys):,} | Already done: {len(all_keys) - len(todo):,} | To do: {len(todo):,}")
+    logger.info(
+        f"Total EN keys: {len(all_keys):,} | Already done: {len(all_keys) - len(todo):,} | To do: {len(todo):,}"
+    )
 
     if not todo:
         logger.info("Nothing to do.")
@@ -90,18 +100,24 @@ def main():
     flush_every = 500
 
     for i in range(0, len(todo), args.batch_size):
-        batch_keys = todo[i:i + args.batch_size]
+        batch_keys = todo[i : i + args.batch_size]
         en_texts = [en_h5[k][()].decode() for k in batch_keys]
         pl_texts = [pl_h5[k][()].decode() if k in pl_h5 else "" for k in batch_keys]
 
         try:
-            fr_texts = batch_translate(en_texts, tokenizer, model, "eng_Latn", "fra_Latn", args.device)
-            es_texts = batch_translate(en_texts, tokenizer, model, "eng_Latn", "spa_Latn", args.device)
+            fr_texts = batch_translate(
+                en_texts, tokenizer, model, "eng_Latn", "fra_Latn", args.device
+            )
+            es_texts = batch_translate(
+                en_texts, tokenizer, model, "eng_Latn", "spa_Latn", args.device
+            )
         except Exception as e:
             logger.warning(f"Batch fail at {batch_keys[0]}: {e}")
             continue
 
-        for k, pl, en, fr, es in zip(batch_keys, pl_texts, en_texts, fr_texts, es_texts):
+        for k, pl, en, fr, es in zip(
+            batch_keys, pl_texts, en_texts, fr_texts, es_texts
+        ):
             grp = out_h5.create_group(k)
             grp.create_dataset("pl", data=pl)
             grp.create_dataset("en", data=en)
@@ -113,7 +129,9 @@ def main():
             out_h5.flush()
             elapsed = (time.time() - start) / 60
             done = i + len(batch_keys)
-            logger.info(f"{done:,}/{len(todo):,} | {elapsed:.1f}min | rate {done/elapsed:.1f}/min")
+            logger.info(
+                f"{done:,}/{len(todo):,} | {elapsed:.1f}min | rate {done / elapsed:.1f}/min"
+            )
 
     pbar.close()
     out_h5.flush()

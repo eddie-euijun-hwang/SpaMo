@@ -18,7 +18,7 @@ class PJMKorpus(torch.utils.data.Dataset):
         keypoint_features_path: str | None = None,
         aux_features_path: str | None = None,
         multilang_path: str | None = None,
-        target_lang: str = 'English',
+        target_lang: str = "English",
     ):
         super().__init__()
 
@@ -33,8 +33,8 @@ class PJMKorpus(torch.utils.data.Dataset):
         self.target_lang = target_lang
 
         # Load only metadata (keys, texts, speaker ids) — features read lazily in __getitem__
-        texts_h5 = h5py.File(texts_path, mode='r')
-        visual_h5 = h5py.File(visual_features_path, mode='r')
+        texts_h5 = h5py.File(texts_path, mode="r")
+        visual_h5 = h5py.File(visual_features_path, mode="r")
         speaker_map = key_to_speaker or {}
 
         all_keys = sorted(visual_h5.keys())
@@ -45,7 +45,7 @@ class PJMKorpus(torch.utils.data.Dataset):
         min_frames = 16
         idx_to_key = [k for k in idx_to_key if visual_h5[k].shape[0] >= min_frames]
         self.samples = [
-            (key, texts_h5[key][()].decode(), speaker_map.get(key, 'unknown'))
+            (key, texts_h5[key][()].decode(), speaker_map.get(key, "unknown"))
             for key in idx_to_key
         ]
         texts_h5.close()
@@ -60,11 +60,23 @@ class PJMKorpus(torch.utils.data.Dataset):
 
     def _open_files(self):
         if self._visual_h5 is None:
-            self._visual_h5 = h5py.File(self.visual_features_path, mode='r')
-            self._motion_h5 = h5py.File(self.motion_features_path, mode='r')
-            self._keypoint_h5 = h5py.File(self.keypoint_features_path, mode='r') if self.keypoint_features_path else None
-            self._aux_h5 = h5py.File(self.aux_features_path, mode='r') if self.aux_features_path else None
-            self._multilang_h5 = h5py.File(self.multilang_path, mode='r') if self.multilang_path else None
+            self._visual_h5 = h5py.File(self.visual_features_path, mode="r")
+            self._motion_h5 = h5py.File(self.motion_features_path, mode="r")
+            self._keypoint_h5 = (
+                h5py.File(self.keypoint_features_path, mode="r")
+                if self.keypoint_features_path
+                else None
+            )
+            self._aux_h5 = (
+                h5py.File(self.aux_features_path, mode="r")
+                if self.aux_features_path
+                else None
+            )
+            self._multilang_h5 = (
+                h5py.File(self.multilang_path, mode="r")
+                if self.multilang_path
+                else None
+            )
 
     def __getitem__(self, index: int) -> dict:
         self._open_files()
@@ -72,34 +84,40 @@ class PJMKorpus(torch.utils.data.Dataset):
 
         item_visual_features = torch.from_numpy(self._visual_h5[key][()])
         item_motion_features = torch.from_numpy(self._motion_h5[key][()])
-        kp = self._keypoint_h5[key][()] if (self._keypoint_h5 and key in self._keypoint_h5) else None
+        kp = (
+            self._keypoint_h5[key][()]
+            if (self._keypoint_h5 and key in self._keypoint_h5)
+            else None
+        )
         aux = self._aux_h5[key][()] if (self._aux_h5 and key in self._aux_h5) else None
 
         num_of_frames = item_visual_features.size(dim=0)
         if num_of_frames > self.max_num_of_frames:
             start_index = random.randint(0, num_of_frames - self.max_num_of_frames)
-            item_visual_features = item_visual_features[start_index:start_index + self.max_num_of_frames]
+            item_visual_features = item_visual_features[
+                start_index : start_index + self.max_num_of_frames
+            ]
 
         out = {
-            'id': key,
-            'pixel_value': item_visual_features,
-            'num_frames': item_visual_features.size(dim=0),
-            'glor_value': item_motion_features,
-            'keypoint_value': torch.from_numpy(kp) if kp is not None else None,
-            'aux_value': torch.from_numpy(aux) if aux is not None else None,
-            'text': text,
-            'lang': self.target_lang,
-            'speaker_id': speaker_id,
+            "id": key,
+            "pixel_value": item_visual_features,
+            "num_frames": item_visual_features.size(dim=0),
+            "glor_value": item_motion_features,
+            "keypoint_value": torch.from_numpy(kp) if kp is not None else None,
+            "aux_value": torch.from_numpy(aux) if aux is not None else None,
+            "text": text,
+            "lang": self.target_lang,
+            "speaker_id": speaker_id,
         }
 
         # Multilang in-context fields (used when t5_slt.use_in_context=True).
         # Layout: features/texts_multilang_pjm.h5 -> /{key}/{pl,en,fr,es}
         if self._multilang_h5 is not None and key in self._multilang_h5:
             grp = self._multilang_h5[key]
-            out['en_text'] = grp['en'][()].decode() if 'en' in grp else text
-            out['fr_text'] = grp['fr'][()].decode() if 'fr' in grp else text
-            out['es_text'] = grp['es'][()].decode() if 'es' in grp else text
-            out['pl_text'] = grp['pl'][()].decode() if 'pl' in grp else text
+            out["en_text"] = grp["en"][()].decode() if "en" in grp else text
+            out["fr_text"] = grp["fr"][()].decode() if "fr" in grp else text
+            out["es_text"] = grp["es"][()].decode() if "es" in grp else text
+            out["pl_text"] = grp["pl"][()].decode() if "pl" in grp else text
 
         return out
 
@@ -125,11 +143,11 @@ class PJMDataModule(pl.LightningDataModule):
         max_frame_length: int = 512,
         batch_size: int = 64,
         num_workers: int = 4,
-        set_to_test: str = 'val',
+        set_to_test: str = "val",
         keypoint_features_path: str | None = None,
         aux_features_path: str | None = None,
         multilang_path: str | None = None,
-        target_lang: str = 'English',
+        target_lang: str = "English",
     ):
         super().__init__()
         self.visual_features_path = visual_features_path
@@ -151,13 +169,13 @@ class PJMDataModule(pl.LightningDataModule):
     @staticmethod
     def _load_split(path: str):
         df = pd.read_csv(path)
-        keys = set(df['key'].astype(str))
-        key_to_speaker = dict(zip(df['key'].astype(str), df['speaker_id'].astype(str)))
+        keys = set(df["key"].astype(str))
+        key_to_speaker = dict(zip(df["key"].astype(str), df["speaker_id"].astype(str)))
         return keys, key_to_speaker
 
     def setup(self, stage=None):
         train_keys, train_k2s = self._load_split(self.train_split_path)
-        val_keys,   val_k2s   = self._load_split(self.val_split_path)
+        val_keys, val_k2s = self._load_split(self.val_split_path)
         self.train_set = PJMKorpus(
             self.visual_features_path,
             self.motion_features_path,
@@ -219,9 +237,9 @@ class PJMDataModule(pl.LightningDataModule):
         )
 
     def test_dataloader(self):
-        if self.set_to_test == 'test' and hasattr(self, 'test_set'):
+        if self.set_to_test == "test" and hasattr(self, "test_set"):
             dataset = self.test_set
-        elif self.set_to_test == 'train':
+        elif self.set_to_test == "train":
             dataset = self.train_set
         else:
             dataset = self.val_set
@@ -234,8 +252,13 @@ class PJMDataModule(pl.LightningDataModule):
         )
 
 
-if __name__ == '__main__':
-    dataset = PJMKorpus('features/vit_feat_pjm.h5', 'features/mae_feat_pjm.h5', 'features/texts_eng.h5', device='cpu')
+if __name__ == "__main__":
+    dataset = PJMKorpus(
+        "features/vit_feat_pjm.h5",
+        "features/mae_feat_pjm.h5",
+        "features/texts_eng.h5",
+        device="cpu",
+    )
     loader = torch.utils.data.DataLoader(dataset, batch_size=8, collate_fn=collate_data)
     batch = next(iter(loader))
     print(f"Batch size: {len(batch)}, keys: {list(batch[0].keys())}")
