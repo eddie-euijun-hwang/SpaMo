@@ -5,10 +5,10 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
 # Import models and dataset
-from dataset.pjm import PJMDatamodule
+from dataset.pjm import PJMDataModule
 from dataset.T5 import T5DataModule
 from dataset.fusion import FusionDataModule
-from spamo.fusion_model import FusionModel, LightningFusion
+from models.fusion import LightningFusion
 from spamo.t5_model import T5SLT
 import h5py
 import numpy as np
@@ -74,7 +74,7 @@ def collate_fn_fusion(batch):
         'texts': texts
     }
 
-class MockPJMDatamodule(PJMDatamodule):
+class MockPJMDatamodule(PJMDataModule):
     def __init__(self, collate_fn, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.collate_fn = collate_fn
@@ -98,15 +98,6 @@ def test_fusion_model():
         num_workers=0
     )
     
-    # Setup Model
-    fusion_net = FusionModel(
-        vision_input_dim=2048,
-        motion_input_dim=1024,
-        hidden_dim=768,
-        target_size=2048, # Assuming T5 hidden size or similar
-        device='cpu'
-    )
-    
     # Create dummy weights for testing
     dummy_weights_path = os.path.join(MOCK_DIR, 'dummy_embeddings.pt')
     # T5-small vocab size is approx 32128, hidden dim 512 (but we used 2048 in fusion model target size)
@@ -114,11 +105,14 @@ def test_fusion_model():
     torch.save(torch.randn(32128, 2048), dummy_weights_path)
 
     model = LightningFusion(
-        fusion_model=fusion_net,
+        vision_input_dim=2048,
+        motion_input_dim=1024,
+        hidden_dim=768,
+        target_size=2048,
+        device='cpu',
         t5_checkpoint='google/flan-t5-small', # Use small for test
         target_embedding_weights_path=dummy_weights_path,
         max_txt_len=32,
-        cache_dir='./cache'
     )
     
     # Mock target embeddings since we don't have the file
