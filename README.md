@@ -88,18 +88,18 @@ References are DeepL translations of the Polish transcripts. The PHOENIX-2014T S
 
 ## Reproduce
 
-Checkpoints are in [CrocoSign/pjm-models](https://huggingface.co/CrocoSign/pjm-models) under `checkpoints/spamo/<folder>/`, and the test outputs and logs under `results/spamo/`. The SpaMo PHOENIX-2014T rows were trained with the upstream SpaMo code plus our changes in `upstream/spamo-pjm.patch` (apply to [eddie-euijun-hwang/SpaMo](https://github.com/eddie-euijun-hwang/SpaMo) at `aee7f8b`, with `git apply`), starting from the upstream PHOENIX-2014T checkpoint `spamo.ckpt`. Everything else uses this repository; tests take `--train False --test True --ckpt <checkpoint>`.
+Checkpoints are in [CrocoSign/pjm-models](https://huggingface.co/CrocoSign/pjm-models) under `checkpoints/spamo/<folder>/`, and the test outputs and logs under `results/spamo/`. The SpaMo PHOENIX-2014T rows were trained with the upstream SpaMo code plus our changes in `upstream/spamo-pjm.patch` (apply to [eddie-euijun-hwang/SpaMo](https://github.com/eddie-euijun-hwang/SpaMo) at `aee7f8b`, with `git apply`), starting from the upstream PHOENIX-2014T checkpoint `spamo.ckpt`. Everything else uses this repository. Pass `-e bleu` when training: the default metric selects checkpoints and stops early on the wrong direction. Tests take `-c <test config> --train False --test True --ckpt <checkpoint> -e bleu`.
 
 | Row | Train | Test config | Checkpoint folder |
 | --- | --- | --- | --- |
 | SpaMo PHOENIX-2014T MS | upstream: `python main.py -c configs/finetune_pjm_ms.yaml --ckpt spamo.ckpt -e bleu` | `finetune_v26_dual_paper_faithful_from_upstream.yaml` | `spamo-pjm-phoenix-ms` |
 | SpaMo PHOENIX-2014T SI | upstream: `python main.py -c configs/finetune_pjm_si.yaml --ckpt spamo.ckpt -e bleu --patience 5` | `si_v26_dual.yaml` | `spamo-pjm-phoenix-si` |
-| Mod-SpaMo PHOENIX-2014T MS | `finetune_v27_quad_xattn_from_upstream.yaml`, `--ckpt` the SpaMo MS checkpoint | same | `mod-spamo-pjm-phoenix-ms` |
-| Mod-SpaMo PHOENIX-2014T SI | `si_v27_quad.yaml`, `--ckpt` the SpaMo SI checkpoint | same | `mod-spamo-pjm-phoenix-si` |
-| SpaMo / Mod-SpaMo scratch MS | `finetune_v30_dual_ms_scratch.yaml`, `finetune_v31_quad_xattn_ms_scratch.yaml` | same | `spamo-pjm-scratch-ms`, `mod-spamo-pjm-scratch-ms` |
-| SpaMo / Mod-SpaMo scratch SI | `finetune_v32_dual_si_scratch.yaml`, `finetune_v33_quad_xattn_si_scratch.yaml` | same | `spamo-pjm-scratch-si`, `mod-spamo-pjm-scratch-si` |
+| Mod-SpaMo PHOENIX-2014T MS | `python main.py -c configs/finetune_v27_quad_xattn_from_upstream.yaml --ckpt <SpaMo MS checkpoint> -e bleu` | same | `mod-spamo-pjm-phoenix-ms` |
+| Mod-SpaMo PHOENIX-2014T SI | `python main.py -c configs/si_v27_quad.yaml --ckpt <SpaMo SI checkpoint> -e bleu` | same | `mod-spamo-pjm-phoenix-si` |
+| SpaMo / Mod-SpaMo scratch MS | `python main.py -c configs/finetune_v30_dual_ms_scratch.yaml -e bleu` (Mod-SpaMo: `finetune_v31_quad_xattn_ms_scratch.yaml`) | same | `spamo-pjm-scratch-ms`, `mod-spamo-pjm-scratch-ms` |
+| SpaMo / Mod-SpaMo scratch SI | `python main.py -c configs/finetune_v32_dual_si_scratch.yaml -e bleu` (Mod-SpaMo: `finetune_v33_quad_xattn_si_scratch.yaml`) | same | `spamo-pjm-scratch-si`, `mod-spamo-pjm-scratch-si` |
 
-The SI chain (SpaMo SI training, its test, Mod-SpaMo SI training and test) is `run_phoenix_si.sh` in the patch. BLEURT-20 comes from `scripts/compute_bleurt.py <test_outputs.txt>`.
+`run_phoenix_si.sh` in the patch is the script that ran the SI chain (SpaMo SI training, its test, Mod-SpaMo SI training and test) on our machine; it uses our directory layout, so read it as a record of the four commands above. BLEURT-20 comes from `scripts/compute_bleurt.py <test_outputs.txt>`.
 
 ## Upstream
 

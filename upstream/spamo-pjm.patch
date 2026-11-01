@@ -40,7 +40,7 @@ index 5a72c21..da7dd17 100644
                  glosses.append(sample['gloss'])
                  langs.append(sample['lang'])
                  
-+                # Use pl_text if present (PJM EN target: avoids degenerate en==text identity);
++                # Use pl_text if present, else en_text (our PJM dataset sets only en_text);
 +                # otherwise fall back to en_text (Phoenix DE->DE: paper original).
 +                first_lang = sample.get('pl_text') or sample.get('en_text', sample['text'])
                  _ex_lang_trans = [
@@ -126,9 +126,9 @@ index 0000000..69d8628
 --- /dev/null
 +++ b/configs/finetune_pjm_ms.yaml
 @@ -0,0 +1,76 @@
-+# Finetune PJM-MS na upstream SpaMo (paper-faithful code).
-+# Init z released spamo.ckpt (Phoenix DE->DE, BLEU 25.40 ground-truth).
-+# Cel: czysty test "Phoenix->PJM transfer w paper-faithful SpaMo".
++# Fine-tune upstream SpaMo (paper-faithful code) on PJM, MS split.
++# Init from the released spamo.ckpt (PHOENIX-2014T DE->DE, BLEU 25.40 ground truth).
++# Goal: a clean test of PHOENIX-2014T to PJM transfer with paper-faithful SpaMo.
 +model:
 +  target: spamo.t5_slt.FlanT5SLT
 +  params:
@@ -162,7 +162,7 @@ index 0000000..69d8628
 +      params:
 +        logging_interval: step
 +  trainer:
-+    accumulate_grad_batches: 4   # paper batch=8 acc=2 (eff=16); my batch=2 acc=8 = ten sam eff, mniej VRAM
++    accumulate_grad_batches: 4   # paper: batch 8, acc 2; we run batch 2 to fit 24 GB
 +    accelerator: gpu
 +    devices: 1
 +    max_epochs: 100
@@ -208,9 +208,9 @@ index 0000000..2624fdb
 --- /dev/null
 +++ b/configs/finetune_pjm_si.yaml
 @@ -0,0 +1,76 @@
-+# Finetune PJM-MS na upstream SpaMo (paper-faithful code).
-+# Init z released spamo.ckpt (Phoenix DE->DE, BLEU 25.40 ground-truth).
-+# Cel: czysty test "Phoenix->PJM transfer w paper-faithful SpaMo".
++# Fine-tune upstream SpaMo (paper-faithful code) on PJM, SI split.
++# Init from the released spamo.ckpt (PHOENIX-2014T DE->DE, BLEU 25.40 ground truth).
++# Goal: a clean test of PHOENIX-2014T to PJM transfer with paper-faithful SpaMo.
 +model:
 +  target: spamo.t5_slt.FlanT5SLT
 +  params:
@@ -244,7 +244,7 @@ index 0000000..2624fdb
 +      params:
 +        logging_interval: step
 +  trainer:
-+    accumulate_grad_batches: 4   # paper batch=8 acc=2 (eff=16); my batch=2 acc=8 = ten sam eff, mniej VRAM
++    accumulate_grad_batches: 4   # paper: batch 8, acc 2; we run batch 2 to fit 24 GB
 +    accelerator: gpu
 +    devices: 1
 +    max_epochs: 100
@@ -290,9 +290,9 @@ index 0000000..298f53b
 --- /dev/null
 +++ b/configs/eval_local_features.yaml
 @@ -0,0 +1,85 @@
-+# Eval configa upstream SpaMo z naszymi (z Dropbox) features.
++# Eval config: upstream SpaMo with our features (from Dropbox).
 +# Empty postfixes: our spa_feat_p14t.zip / mo_feat_p14t.zip hold plain {fileid}.npy.
-+# Validation/test = test (jak paper).
++# Validation and test both use the test set (as in the paper).
 +model:
 +  target: spamo.t5_slt.FlanT5SLT
 +  params:

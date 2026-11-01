@@ -6,7 +6,7 @@ model:
   target: spamo.t5_slt.FlanT5SLT
   params:
     lr: 1.0e-4              # T5 + LoRA finetune lr
-    fusion_lr: 1.0e-5       # trained projektory soft-freeze
+    fusion_lr: 1.0e-5       # trained projectors, soft freeze
     monitor: val/bleu4
     model_name: google/flan-t5-xl
     cache_dir: null
@@ -29,7 +29,7 @@ model:
     alpha: 1.0
     use_in_context: true
     num_in_context: 3
-    queue_size: 0           # paper-faithful: bez memory bank
+    queue_size: 0           # paper-faithful: no memory bank
     keypoint_dim: 0         # DUAL: no MediaPipe
     aux_input_size: 0       # DUAL: no hand_ViT
     motion_input_size: 1024
